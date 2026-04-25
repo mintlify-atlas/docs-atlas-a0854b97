@@ -1,0 +1,156 @@
+---
+title: "HTMX integration with Aether"
+description: "Use HTMXAttributes to add type-checked HTMX directives to any Aether HTML element, enabling AJAX, CSS transitions, and WebSockets without JavaScript."
+---
+
+`HTMXAttributes` is a `BaseAttribute` mixin that exposes every HTMX directive as a typed keyword argument. Pass its keys directly to any Aether element—Aether converts underscores to hyphens automatically, so `hx_get` becomes the `hx-get` attribute in the rendered HTML.
+
+## Installation
+
+```python
+from aether.plugins.htmx import HTMXAttributes
+```
+
+No separate package is needed; the plugin ships with Aether.
+
+## Attribute naming convention
+
+Aether uses underscores in Python and renders them as hyphens in HTML. This is the standard convention across all Aether elements and plugins.
+
+| Python kwarg | HTML attribute |
+|---|---|
+| `hx_get` | `hx-get` |
+| `hx_push_url` | `hx-push-url` |
+| `hx_swap_oob` | `hx-swap-oob` |
+
+## Key attributes
+
+<ParamField path="hx_get" type="str">
+  Issues a `GET` request to the given URL when the element triggers.
+</ParamField>
+
+<ParamField path="hx_post" type="str">
+  Issues a `POST` request to the given URL.
+</ParamField>
+
+<ParamField path="hx_put" type="str">
+  Issues a `PUT` request to the given URL.
+</ParamField>
+
+<ParamField path="hx_patch" type="str">
+  Issues a `PATCH` request to the given URL.
+</ParamField>
+
+<ParamField path="hx_delete" type="str">
+  Issues a `DELETE` request to the given URL.
+</ParamField>
+
+<ParamField path="hx_target" type='"this" | "next" | "previous" | str'>
+  CSS selector for the element to update. Use `"this"` to target the element itself, `"next"` or `"previous"` for siblings, or any CSS selector string.
+</ParamField>
+
+<ParamField path="hx_swap" type="Literal">
+  Controls how the response replaces the target. Accepted values:
+
+  `innerHTML` · `outerHTML` · `textContent` · `beforebegin` · `afterbegin` · `beforeend` · `afterend` · `delete` · `none`
+</ParamField>
+
+<ParamField path="hx_trigger" type="str">
+  Event that triggers the request (e.g. `"click"`, `"change"`, `"revealed"`). Supports HTMX modifiers like `"click once"` or `"every 2s"`.
+</ParamField>
+
+<ParamField path="hx_boost" type='"true"'>
+  Progressively enhances anchor tags and forms to use AJAX instead of full page reloads.
+</ParamField>
+
+<ParamField path="hx_push_url" type='"true" | "false" | str'>
+  Pushes a URL into the browser history. Pass `"true"` to push the request URL, or a custom path string.
+</ParamField>
+
+<ParamField path="hx_vals" type="str">
+  Extra JSON values to include with the request (e.g. `'{"key": "value"}'`).
+</ParamField>
+
+<ParamField path="hx_confirm" type="str">
+  Shows a `confirm()` dialog with this message before sending the request.
+</ParamField>
+
+<ParamField path="hx_indicator" type="str">
+  CSS selector for an element to show during the request (e.g. a spinner).
+</ParamField>
+
+<ParamField path="hx_select" type="str">
+  CSS selector to extract a fragment from the response before swapping.
+</ParamField>
+
+<ParamField path="hx_swap_oob" type='"true" | str'>
+  Marks an element for out-of-band swapping. Elements in the response with a matching `id` are swapped independently of the main target.
+</ParamField>
+
+<ParamField path="hx_sync" type="str">
+  Coordinates multiple requests on an element, e.g. `"this:abort"` cancels an in-flight request if a new one fires.
+</ParamField>
+
+<ParamField path="hx_params" type='"*" | "none" | str'>
+  Controls which parameters are included in the request. `"*"` includes all, `"none"` excludes all, or supply a comma-separated list.
+</ParamField>
+
+<ParamField path="hx_disabled_elt" type='"this" | "next" | "previous" | str'>
+  Disables the matched element(s) while a request is in flight.
+</ParamField>
+
+## Additional attributes
+
+The following attributes are also available but less commonly used:
+
+| Attribute | Type | Notes |
+|---|---|---|
+| `hx_disable` | `bool` | Disables HTMX processing on this element and its children |
+| `hx_disinherit` | `"*" \| str` | Prevents listed attributes from being inherited by children |
+| `hx_encoding` | `str` | Sets form encoding, e.g. `"multipart/form-data"` |
+| `hx_ext` | `str` | Comma-separated list of HTMX extensions to enable |
+| `hx_headers` | `str` | JSON object of extra headers to include |
+| `hx_history` | `"false"` | Excludes this page from the history cache |
+| `hx_history_elt` | `bool` | Marks this element as the history snapshot target |
+| `hx_include` | `str` | Additional elements whose values are included in the request |
+| `hx_inherit` | `str` | Re-enables inherited attributes previously disabled by `hx_disinherit` |
+| `hx_preserve` | `bool` | Keeps this element unchanged across swaps |
+| `hx_prompt` | `str` | Shows a `prompt()` dialog; the input value is sent as `HX-Prompt` |
+| `hx_replace_url` | `"true" \| "false" \| str` | Replaces the current URL without adding a history entry |
+| `hx_request` | `str` | JSON to override request parameters (timeout, credentials, etc.) |
+| `hx_select_oob` | `str` | Out-of-band variant of `hx_select` with a target selector |
+| `hx_validate` | `"true"` | Forces HTML5 validation before submitting |
+
+<Note>
+  `hx_on*` event handler attributes (e.g. `hx-on:htmx:before-request`) are not yet implemented in `HTMXAttributes`.
+</Note>
+
+## Example: click-to-load
+
+The following builds a button that loads new content and replaces a target element on click.
+
+```python
+from aether.tags.html import Button, Div, Img
+from aether import render
+
+click_to_load = Div(id="replace_me")(
+    Button(
+        _class="btn primary",
+        hx_get="/example/?data=1",
+        hx_target="#replace_me",
+        hx_swap="outerHTML",
+    )(
+        "Load More Data...",
+        Img(_class="htmx-indicator", src="/img/bars.svg", alt="Loading..."),
+    )
+)
+
+print(render(click_to_load))
+```
+
+The `hx_target="#replace_me"` selector points back to the wrapping `Div`, so the entire container—including the button—is replaced by the server response.
+
+## Related
+
+- [Elements reference](/concepts/elements)
+- [Attribute handling](/concepts/attributes)

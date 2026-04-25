@@ -1,0 +1,202 @@
+---
+title: "Building forms with Aether"
+description: "Use Aether's typed Form, Input, Label, Select, Textarea, and Button elements to build accessible, validated HTML forms in pure Python."
+---
+
+Aether provides fully typed HTML form elements that map directly to their HTML counterparts. Every attribute is validated at construction time, and Python keyword arguments follow the same underscore-to-hyphen convention used across the library.
+
+## Form element
+
+`Form` wraps your inputs and controls how the browser submits data. Its key attributes are `action` (the submission URL) and `method`:
+
+```python
+from aether.tags.html import Form
+
+form = Form(action="/contact", method="post")
+```
+
+Other `FormAttributes` include `autocomplete`, `enctype`, `name`, `novalidate`, and `target`.
+
+## Input element
+
+`Input` is a void element (no children). Its `type` attribute defaults to `"text"` when omitted:
+
+```python
+from aether.tags.html import Input
+
+# Text input (default)
+text_input = Input(name="username", value="", id="username")
+
+# Email input
+email_input = Input(type="email", name="email", id="email")
+
+# Password input
+password_input = Input(type="password", name="password", id="password")
+```
+
+`InputAttributes` accepts: `type`, `name`, `value`, `autocomplete`, `disabled`, `form`, and all global HTML attributes (`id`, `_class`, `placeholder`, `required`, `style`, etc. via `GlobalHTMLAttributes`).
+
+<Note>
+  `Input` has `have_children = False`. Calling it with children raises a warning
+  and no children are appended.
+</Note>
+
+## Label element
+
+`Label` links text to a control via the `_for` attribute, which renders as the HTML `for` attribute:
+
+```python
+from aether.tags.html import Label
+
+label = Label(_for="email")("Email address")
+```
+
+The leading underscore prevents collision with Python's built-in `for` keyword. It is stripped before rendering.
+
+## Select and Option
+
+Build dropdown menus with `Select` and `Option`. `Select` only accepts `Option`, `Optgroup`, and `Hr` as children — other types raise a `ValueError`:
+
+```python
+from aether.tags.html import Select, Option
+
+country_select = Select(name="country", id="country", required=True)(
+    Option(value="")("Choose a country…"),
+    Option(value="us")("United States"),
+    Option(value="gb")("United Kingdom"),
+    Option(value="au")("Australia"),
+)
+```
+
+`SelectAttributes` includes `autocomplete`, `disabled`, `form`, `multiple`, `name`, `required`, and `size`. `OptionAttributes` includes `disabled`, `label`, `selected`, and `value`.
+
+## Textarea
+
+`Textarea` accepts multi-line text. Its text content is passed as a child string:
+
+```python
+from aether.tags.html import Textarea
+
+message_area = Textarea(
+    name="message",
+    id="message",
+    rows=5,
+    placeholder="Your message…",
+    required=True,
+)("")
+```
+
+`TextareaAttributes` includes `autocomplete`, `cols`, `disabled`, `form`, `maxlength`, `minlength`, `name`, `placeholder`, `readonly`, `required`, `rows`, and `wrap`.
+
+## Button types
+
+`Button` defaults to `type="button"`, which prevents accidental form submission. Use `type="submit"` for the submit action and `type="reset"` to clear the form:
+
+```python
+from aether.tags.html import Button
+
+submit_btn = Button(type="submit", _class="btn btn--primary")("Send message")
+reset_btn  = Button(type="reset",  _class="btn btn--secondary")("Clear")
+plain_btn  = Button(type="button", _class="btn")("Preview")
+```
+
+<Warning>
+  `formaction`, `formenctype`, `formmethod`, `formnovalidate`, and `formtarget`
+  are only valid when `type` is `"submit"` or `"reset"`. Passing them alongside
+  `type="button"` raises a `ValueError` at construction time.
+</Warning>
+
+## Fieldset and Legend
+
+Group related controls with `Fieldset` and label the group with `Legend`:
+
+```python
+from aether.tags.html import Fieldset, Legend, Input, Label
+
+address_group = Fieldset(name="address")(
+    Legend()("Shipping address"),
+    Label(_for="street")("Street"),
+    Input(type="text", name="street", id="street"),
+    Label(_for="city")("City"),
+    Input(type="text", name="city", id="city"),
+)
+```
+
+`FieldsetAttributes` includes `disabled`, `form`, and `name`.
+
+## Form validation
+
+Pass browser-native validation attributes through `GlobalHTMLAttributes`. Aether does not add its own validation layer — it relies on the attributes you set:
+
+```python
+Input(
+    type="email",
+    name="email",
+    id="email",
+    required=True,
+    placeholder="you@example.com",
+)
+```
+
+Attributes like `required`, `pattern`, `minlength`, `maxlength`, and `disabled` are all available via `GlobalHTMLAttributes` and each element's own attribute class.
+
+## Complete example: contact form
+
+```python
+from aether.tags.html import (
+    Form, Fieldset, Legend,
+    Label, Input, Textarea,
+    Button, Div,
+)
+from aether import render
+
+contact_form = Form(action="/contact", method="post", autocomplete="on")(
+    Fieldset()(
+        Legend()("Send us a message"),
+
+        Div(_class="field")(
+            Label(_for="name")("Your name"),
+            Input(type="text", name="name", id="name", required=True, placeholder="Jane Smith"),
+        ),
+
+        Div(_class="field")(
+            Label(_for="email")("Email address"),
+            Input(type="email", name="email", id="email", required=True, placeholder="jane@example.com"),
+        ),
+
+        Div(_class="field")(
+            Label(_for="message")("Message"),
+            Textarea(
+                name="message",
+                id="message",
+                rows=6,
+                required=True,
+                placeholder="Tell us how we can help…",
+            )(""),
+        ),
+
+        Div(_class="field field--actions")(
+            Button(type="submit", _class="btn btn--primary")("Send message"),
+            Button(type="reset", _class="btn btn--secondary")("Clear"),
+        ),
+    )
+)
+
+print(render(contact_form))
+```
+
+## Progressive enhancement with HTMX
+
+For partial-page updates without a full page reload, add HTMX attributes directly as keyword arguments — Aether's underscore-to-hyphen conversion handles them automatically:
+
+```python
+form = Form(
+    hx_post="/contact",
+    hx_target="#form-result",
+    hx_swap="outerHTML",
+)(
+    # … inputs …
+)
+```
+
+See the [HTMX plugin guide](/plugins/htmx) for a full walkthrough of HTMX integration with Aether.

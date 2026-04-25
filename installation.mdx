@@ -1,0 +1,86 @@
+---
+title: "Install Aether"
+description: "Install pyaether from PyPI using pip, uv, or poetry. Requires Python 3.10+. Verify your setup and pin to a minor version for stable pre-1.0.0 builds."
+---
+
+Aether is published on PyPI as `pyaether`. This page covers installing Aether, the Python version and dependency requirements, and how to verify your installation.
+
+## Install Aether
+
+<CodeGroup>
+
+```bash pip
+pip install pyaether
+```
+
+```bash uv
+uv add pyaether
+```
+
+```bash poetry
+poetry add pyaether
+```
+
+</CodeGroup>
+
+## Requirements
+
+| Requirement | Minimum version |
+|---|---|
+| Python | `>= 3.10` |
+| pydantic | `>= 2.10` |
+| typing-extensions | `>= 4` |
+
+Both `pydantic` and `typing-extensions` are installed automatically as dependencies of `pyaether`.
+
+## Verify your installation
+
+After installing, confirm everything is working with a quick import and render:
+
+```python
+from aether.tags.html import H1, Div, P
+from aether import render, __version__
+
+print(__version__)
+
+page = Div(_class="container")(
+    H1()("Hello, Aether!"),
+    P()("Installation successful.")
+)
+
+print(render(page))
+```
+
+If the install succeeded, you will see the version number followed by the rendered HTML:
+
+```
+0.4.21
+<div class="container"><h1>Hello, Aether!</h1><p>Installation successful.</p></div>
+```
+
+## Pin your dependency
+
+<Note>
+Aether has not yet reached `v1.0.0`. Minor version updates may introduce breaking changes. To prevent unexpected breakage, pin your dependency to a specific minor version range in your `pyproject.toml` or `requirements.txt`.
+
+```toml pyproject.toml
+dependencies = ["pyaether>=0.4,<0.5"]
+```
+
+```text requirements.txt
+pyaether>=0.4,<0.5
+```
+
+Review the [changelog](/reference/changelog) before upgrading to a new minor version.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first component and render it in a few minutes.
+  </Card>
+  <Card title="Core concepts" icon="book" href="/concepts/elements">
+    Understand how elements, attributes, and rendering work.
+  </Card>
+</CardGroup>

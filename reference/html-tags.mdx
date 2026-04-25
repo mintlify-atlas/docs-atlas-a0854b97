@@ -1,0 +1,264 @@
+---
+title: "HTML5 element reference for Aether"
+description: "Complete reference for all HTML5 elements available in aether.tags.html, organized by category with attribute TypedDicts for each element."
+---
+
+`aether.tags.html` provides a Python class for every standard HTML5 element. Each class accepts element-specific keyword arguments and inherits the common global attributes from `GlobalHTMLAttributes`. Import the elements you need directly from the module.
+
+```python
+from aether.tags.html import Div, P, H1, Button, Form, Input, Span, A, Img
+```
+
+## Global attributes
+
+Every HTML element class inherits from `GlobalHTMLAttributes`, which defines the attributes common to all HTML elements.
+
+<Note>
+  Use `_class` in Python to set the HTML `class` attribute — the leading underscore is stripped at render time. Underscores in any attribute name are converted to hyphens (e.g., `data_value` → `data-value`).
+</Note>
+
+Common global attributes include: `id`, `_class`, `style`, `hidden`, `role`, `tabindex`, `lang`, `title`, `aria_label`, `data_*`, and all other [ARIA attributes](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes).
+
+Each element also has a matching `*Attributes` TypedDict (e.g., `DivAttributes`, `ButtonAttributes`) that documents its element-specific attributes.
+
+See [elements](/concepts/elements) and [attributes](/concepts/attributes) for more on how attributes work.
+
+---
+
+## Document structure
+
+Elements that form the skeleton of an HTML document.
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `Html` | `HtmlAttributes` | Root element |
+| `Head` | `HeadAttributes` | Document metadata container |
+| `Body` | `BodyAttributes` | Document content container |
+| `Title` | `TitleAttributes` | Document title (text only) |
+| `Meta` | `MetaAttributes` | Metadata (void element) |
+| `Link` | `LinkAttributes` | External resource link (void element) |
+| `Script` | `ScriptAttributes` | Inline or external script |
+| `Style` | `StyleAttributes` | Inline CSS |
+| `Noscript` | `NoscriptAttributes` | Fallback for no-script environments |
+
+```python
+from aether.tags.html import Html, Head, Body, Title, Meta, Link, Script, Style, Noscript
+
+page = Html(lang="en")(
+    Head()(
+        Meta(charset="utf-8"),
+        Title()("My page"),
+        Link(rel="stylesheet", href="/styles.css"),
+    ),
+    Body()(
+        Script(src="/app.js"),
+    ),
+)
+```
+
+---
+
+## Sectioning
+
+Landmark and structural sectioning elements.
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `Header` | `HeaderAttributes` | Page or section header |
+| `Footer` | `FooterAttributes` | Page or section footer |
+| `Main` | `MainAttributes` | Primary page content |
+| `Nav` | `NavAttributes` | Navigation links |
+| `Aside` | `AsideAttributes` | Sidebar / tangential content |
+| `Section` | `SectionAttributes` | Thematic grouping |
+| `Article` | `ArticleAttributes` | Self-contained content unit |
+| `Hgroup` | `HgroupAttributes` | Heading group |
+| `Address` | `AddressAttributes` | Contact information |
+
+---
+
+## Headings
+
+| Element | Attributes TypedDict |
+|---|---|
+| `H1` | `HAttributes` |
+| `H2` | `HAttributes` |
+| `H3` | `HAttributes` |
+| `H4` | `HAttributes` |
+| `H5` | `HAttributes` |
+| `H6` | `HAttributes` |
+
+All heading elements share `HAttributes`.
+
+```python
+from aether.tags.html import H1, H2, H3
+
+H1()("Page title")
+H2(_class="section-heading")("Section title")
+```
+
+---
+
+## Text content
+
+Block-level elements for text and lists.
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `P` | `PAttributes` | Paragraph |
+| `Div` | `DivAttributes` | Generic block container |
+| `Blockquote` | `BlockquoteAttributes` | Block quotation |
+| `Dd` | `DdAttributes` | Description list definition |
+| `Dl` | `DlAttributes` | Description list |
+| `Dt` | `DtAttributes` | Description list term |
+| `Figcaption` | `FigcaptionAttributes` | Figure caption |
+| `Figure` | `FigureAttributes` | Figure with optional caption |
+| `Hr` | `HrAttributes` | Thematic break (void element) |
+| `Li` | `LiAttributes` | List item |
+| `Menu` | `MenuAttributes` | Unordered list (toolbar context) |
+| `Ol` | `OlAttributes` | Ordered list |
+| `Pre` | `PreAttributes` | Preformatted text |
+| `Ul` | `UlAttributes` | Unordered list |
+
+---
+
+## Inline text semantics
+
+Inline elements for annotating and styling runs of text.
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `A` | `AAttributes` | Hyperlink |
+| `Abbr` | `AbbrAttributes` | Abbreviation |
+| `B` | `BAttributes` | Bold (stylistic) |
+| `Bdi` | `BdiAttributes` | Bidirectional isolate |
+| `Bdo` | `BdoAttributes` | Bidirectional override |
+| `Br` | `BrAttributes` | Line break (void element) |
+| `Cite` | `CiteAttributes` | Citation |
+| `Code` | `CodeAttributes` | Inline code |
+| `Data` | `DataAttributes` | Machine-readable value |
+| `Dfn` | `DfnAttributes` | Definition |
+| `Em` | `EmAttributes` | Emphasis |
+| `I` | `IAttributes` | Italic (stylistic) |
+| `Ins` | `InsAttributes` | Inserted text |
+| `Del` | `DelAttributes` | Deleted text |
+| `Kbd` | `KbdAttributes` | Keyboard input |
+| `Mark` | `MarkAttributes` | Highlighted text |
+| `Q` | `QAttributes` | Inline quotation |
+| `Rp` | `RpAttributes` | Ruby fallback parenthesis |
+| `Rt` | `RtAttributes` | Ruby text annotation |
+| `Ruby` | `RubyAttributes` | Ruby annotation container |
+| `S` | `SAttributes` | Strikethrough |
+| `Samp` | `SampAttributes` | Sample output |
+| `Small` | `SmallAttributes` | Small print |
+| `Span` | `SpanAttributes` | Generic inline container |
+| `Strong` | `StrongAttributes` | Strong importance |
+| `Sub` | `SubAttributes` | Subscript |
+| `Sup` | `SupAttributes` | Superscript |
+| `Time` | `TimeAttributes` | Date/time value |
+| `U` | `UAttributes` | Unarticulated annotation |
+| `Var` | `VarAttributes` | Variable |
+| `Wbr` | `WbrAttributes` | Word break opportunity (void element) |
+
+---
+
+## Embedded content
+
+Elements for media and external resources.
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `Audio` | `AudioAttributes` | Audio player |
+| `Canvas` | `CanvasAttributes` | Scripted 2D/3D drawing surface |
+| `Embed` | `EmbedAttributes` | External content (void element) |
+| `Iframe` | `IframeAttributes` | Inline frame |
+| `Img` | `ImgAttributes` | Image (void element) |
+| `Object` | `ObjectAttributes` | External resource |
+| `Picture` | `PictureAttributes` | Responsive image container |
+| `Source` | `SourceAttributes` | Media source (void element) |
+| `Track` | `TrackAttributes` | Timed text track (void element) |
+| `Video` | `VideoAttributes` | Video player |
+
+---
+
+## Forms
+
+Form controls and related elements.
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `Button` | `ButtonAttributes` | Clickable button |
+| `Datalist` | `DatalistAttributes` | Autocomplete option list |
+| `Fieldset` | `FieldsetAttributes` | Group of form controls |
+| `Form` | `FormAttributes` | Form container |
+| `Input` | `InputAttributes` | Form input (void element) |
+| `Label` | `LabelAttributes` | Form control label |
+| `Legend` | `LegendAttributes` | Fieldset caption |
+| `Meter` | `MeterAttributes` | Scalar measurement |
+| `Optgroup` | `OptgroupAttributes` | Option group |
+| `Option` | `OptionAttributes` | Select option |
+| `Output` | `OutputAttributes` | Computed result |
+| `Progress` | `ProgressAttributes` | Progress indicator |
+| `Select` | `SelectAttributes` | Drop-down list |
+| `Textarea` | `TextareaAttributes` | Multi-line text input |
+
+```python
+from aether.tags.html import Form, Label, Input, Button
+
+Form(action="/submit", method="post")(
+    Label(_for="email")("Email address"),
+    Input(type="email", id="email", name="email", required=True),
+    Button(type="submit")("Send"),
+)
+```
+
+---
+
+## Tables
+
+Elements for tabular data.
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `Caption` | `CaptionAttributes` | Table caption |
+| `Col` | `ColAttributes` | Table column (void element) |
+| `Colgroup` | `ColgroupAttributes` | Group of columns |
+| `Table` | `TableAttributes` | Table root |
+| `Tbody` | `TbodyAttributes` | Table body |
+| `Td` | `TdAttributes` | Table data cell |
+| `Tfoot` | `TfootAttributes` | Table footer |
+| `Th` | `ThAttributes` | Table header cell |
+| `Thead` | `TheadAttributes` | Table header group |
+| `Tr` | `TrAttributes` | Table row |
+
+---
+
+## Interactive elements
+
+Elements for interactive UI patterns.
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `Details` | `DetailsAttributes` | Disclosure widget |
+| `Dialog` | `DialogAttributes` | Modal or non-modal dialog |
+| `Search` | `SearchAttributes` | Search landmark |
+| `Slot` | `SlotAttributes` | Web component slot |
+| `Summary` | `SummaryAttributes` | Summary for `Details` |
+| `Template` | `TemplateAttributes` | Inert HTML template |
+
+---
+
+## MathML
+
+Aether also provides a `aether.tags.mathml` module for embedding MathML. The current release exports one top-level element:
+
+| Element | Attributes TypedDict | Notes |
+|---|---|---|
+| `Math` | `MathAttributes` | Root MathML element |
+
+```python
+from aether.tags.mathml import Math
+
+Math(display="block")("MathML content")
+```
+
+`MathAttributes` accepts `display` (`"block"` or `"inline"`, defaults to `"inline"`). Additional MathML child elements are not yet exported — use the `Math` container to wrap raw MathML markup via `mark_safe` if needed.

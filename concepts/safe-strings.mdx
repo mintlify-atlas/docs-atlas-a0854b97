@@ -1,0 +1,187 @@
+---
+title: "Safe strings and HTML escaping"
+description: "Aether escapes all text content automatically using html.escape(). SafeString and mark_safe let you inject trusted HTML fragments without double-escaping."
+---
+
+By default, every piece of text content that passes through Aether's rendering pipeline is HTML-escaped. This protects against cross-site scripting (XSS) vulnerabilities without any extra effort. When you need to embed a fragment of pre-rendered or trusted HTML, `SafeString` and `mark_safe` give you a controlled escape hatch. This page explains how the escaping system works and when to use each part of it.
+
+## Automatic escaping
+
+When `render()` is called with `stringify=True` (the default), all non-element children are processed by `safestring_escape()`, which calls Python's standard `html.escape()`. Reserved HTML characters are replaced with their entity equivalents:
+
+| Character | Escaped form |
+| --- | --- |
+| `&` | `&amp;` |
+| `<` | `&lt;` |
+| `>` | `&gt;` |
+| `"` | `&quot;` |
+| `'` | `&#x27;` |
+
+```python
+from aether.tags.html import P
+from aether import render
+
+p = P()('<script>alert("xss")</script>')
+print(render(p))
+# <p>&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;</p>
+```
+
+This happens automatically for every string child — you do not need to escape content manually.
+
+## SafeData and SafeString
+
+`SafeString` (from `aether.safe_string`) is a `str` subclass that carries a trust marker. It indicates that the string has already been produced safely and should not be escaped again.
+
+```python
+from aether.safe_string import SafeString, SafeData
+
+s = SafeString("<em>trusted</em>")
+
+isinstance(s, str)      # True
+isinstance(s, SafeData) # True
+```
+
+`SafeData` is the base class that defines the `__html__` protocol method. Any object that has a `__html__()` method is treated as safe by Aether's escaping logic.
+
+### SafeString concatenation
+
+When you concatenate a `SafeString` with another string, the result is only a `SafeString` if **both** operands are `SafeData`. If you concatenate a `SafeString` with a plain `str`, the result is a plain `str`:
+
+```python
+from aether.safe_string import SafeString
+
+a = SafeString("<b>bold</b>")
+b = SafeString(" text")
+c = " plain string"
+
+print(type(a + b))  # <class 'aether.safe_string.SafeString'>
+print(type(a + c))  # <class 'str'>
+```
+
+This conservative rule prevents accidental trust propagation from unsafe concatenation.
+
+## mark_safe()
+
+`mark_safe()` wraps a plain string in `SafeString`, marking it as safe to render without escaping. It is available from both `aether` and `aether.safe_string`:
+
+```python
+from aether import mark_safe
+from aether.tags.html import Div
+from aether import render
+
+html_fragment = mark_safe("<strong>Important</strong>")
+
+div = Div()(html_fragment, " — regular text")
+print(render(div))
+# <div><strong>Important</strong> &#8212; regular text</div>
+```
+
+`mark_safe()` is a no-op if the input already has `__html__` — it returns the object unchanged:
+
+```python
+from aether import mark_safe
+from aether.safe_string import SafeString
+
+s = SafeString("already safe")
+assert mark_safe(s) is s  # True
+```
+
+## safestring_escape()
+
+`safestring_escape(value, escape_quote)` is the core escaping function used internally by `_render_element()` and `flatten_attributes()`:
+
+- If `value` has a `__html__()` method (i.e. it is `SafeData`), it calls `value.__html__()` and returns the result unchanged.
+- Otherwise, it calls `html.escape(str(value), quote=escape_quote)` and wraps the result in `SafeString`.
+
+```python
+from aether.safe_string import SafeString, safestring_escape, mark_safe
+
+# Plain string — escaped and wrapped in SafeString
+result = safestring_escape('<script>', True)
+print(result)       # &lt;script&gt;
+print(type(result)) # <class 'aether.safe_string.SafeString'>
+
+# SafeString — returned as-is
+safe = mark_safe("<em>ok</em>")
+result = safestring_escape(safe, True)
+print(result)       # <em>ok</em>
+```
+
+## The __html__ protocol
+
+Any Python object that implements `__html__(self)` is treated as safe. This follows the same convention used by Jinja2, Django, and other Python web frameworks. If you have a custom type that produces trusted HTML, implement `__html__` and it will pass through unescaped:
+
+```python
+class TrustedHTML:
+    def __init__(self, html: str):
+        self._html = html
+
+    def __html__(self):
+        return self._html
+
+
+from aether.tags.html import Div
+from aether import render
+
+fragment = TrustedHTML("<em>safe content</em>")
+print(render(Div()(fragment)))
+# <div><em>safe content</em></div>
+```
+
+## When to use mark_safe
+
+Use `mark_safe` when you have a string that contains valid HTML you have produced yourself or sourced from a fully trusted internal system, and you want it rendered as raw HTML rather than as escaped text.
+
+**Safe uses:**
+
+```python
+from aether import mark_safe, render
+from aether.tags.html import Div, P
+
+# Pre-rendered HTML from another render() call
+inner = render(P()("A paragraph."))          # render() returns SafeString
+outer = Div()(inner)
+print(render(outer))
+# <div><p>A paragraph.</p></div>
+
+# A known-safe SVG icon string from your own codebase
+icon = mark_safe('<svg width="16" height="16"><use href="#icon-check"/></svg>')
+```
+
+<Warning>
+**Never pass user-supplied content to `mark_safe`.** If an attacker controls the string, marking it safe allows arbitrary HTML and JavaScript to be injected into your page (XSS). Only use `mark_safe` on strings your own code has produced or that come from a source you fully control.
+</Warning>
+
+## When not to use mark_safe
+
+<AccordionGroup>
+  <Accordion title="User-supplied text (always escape)">
+    Any string that comes from a form submission, URL parameter, database record written by users, or external API response should never be marked safe. Pass it as a plain string and let Aether escape it.
+
+    ```python
+    # Correct — user_input is escaped automatically
+    from aether.tags.html import P
+    from aether import render
+
+    user_input = '<img src=x onerror=alert(1)>'
+    print(render(P()(user_input)))
+    # <p>&lt;img src=x onerror=alert(1)&gt;</p>
+
+    # Wrong — do not do this
+    # from aether import mark_safe
+    # print(render(P()(mark_safe(user_input))))  # XSS vulnerability
+    ```
+  </Accordion>
+  <Accordion title="Third-party API responses">
+    HTML returned by third-party services may contain unexpected or malicious markup. Treat it as untrusted and escape it unless you have verified the source and sanitised the content with a dedicated HTML sanitiser library.
+  </Accordion>
+  <Accordion title="Content from a database">
+    Even if you stored the content yourself, previously stored values may have been written before your application had proper input sanitisation. Escape database content by default unless you can guarantee it was stored as a `SafeString` originally produced by Aether or another trusted system.
+  </Accordion>
+</AccordionGroup>
+
+## See also
+
+<Card title="Rendering elements to HTML strings" icon="play" href="/concepts/rendering">
+  How render() and stringify work, and how safestring_escape fits into the rendering pipeline.
+</Card>

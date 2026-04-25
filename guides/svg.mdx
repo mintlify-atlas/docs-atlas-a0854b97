@@ -1,0 +1,182 @@
+---
+title: "Inline SVG with Aether"
+description: "Build inline SVG graphics using the same Python API as HTML — the aether.tags.svg module mirrors the HTML module with full attribute validation."
+---
+
+Aether's `aether.tags.svg` module mirrors the HTML module API for inline SVG. Every SVG element is a subclass of `BaseSVGElement`, which in turn extends `BaseWebElement` with `WebElementType.SVG`. The same two-step call pattern (`Element(**attrs)(children)`) applies, and attribute names follow the same underscore-to-hyphen conversion as HTML elements.
+
+## Available elements
+
+| Element | Description |
+|---|---|
+| `Svg` | Root SVG container |
+| `Circle` | Circle shape |
+| `Ellipse` | Ellipse shape |
+| `Rect` | Rectangle shape |
+| `Path` | Arbitrary path |
+| `Line` | Straight line |
+| `Polygon` | Closed polygon |
+| `G` | Group container |
+| `Defs` | Reusable definitions container |
+| `LinearGradient` | Linear gradient definition |
+| `Stop` | Gradient color stop |
+| `Text` | SVG text node |
+
+## Import path
+
+```python
+from aether.tags.svg import Svg, Circle, Ellipse, Rect, Path, Line, Polygon, G, Defs, LinearGradient, Stop, Text
+```
+
+You can also import individual elements as needed:
+
+```python
+from aether.tags.svg import Svg, Circle
+```
+
+## Embedding SVG in HTML
+
+Place an `Svg` element anywhere you would use an HTML element:
+
+```python
+from aether.tags.html import Div, P
+from aether.tags.svg import Svg, Circle
+from aether import render
+
+page = Div(_class="icon-wrapper")(
+    P()("Profile picture"),
+    Svg(width="64", height="64", viewBox="0 0 64 64")(
+        Circle(cx="32", cy="32", r="30"),
+    ),
+)
+
+print(render(page))
+```
+
+`Svg` defaults: `width="auto"`, `height="auto"`, `viewBox="none"`, `preserveAspectRatio="xMidYMid meet"`, `x="0"`, `y="0"`, `xmlns="http://www.w3.org/2000/svg"`.
+
+## Example: a simple circle
+
+```python
+from aether.tags.svg import Svg, Circle
+from aether import render
+
+icon = Svg(width="100", height="100", viewBox="0 0 100 100")(
+    Circle(cx="50", cy="50", r="40"),
+)
+
+print(render(icon))
+```
+
+`CircleAttributes`: `cx`, `cy`, `r`, `pathLength`. All are strings and default to `"0"`.
+
+## Example: bar chart SVG
+
+Use `Rect` elements to build a simple bar chart. `RectAttributes` accepts `x`, `y`, `width`, `height`, `rx`, `ry`, and `pathLength`, all as strings:
+
+```python
+from aether.tags.svg import Svg, Rect, G
+from aether import render
+
+data = [
+    {"label": "Jan", "value": 40},
+    {"label": "Feb", "value": 70},
+    {"label": "Mar", "value": 55},
+    {"label": "Apr", "value": 90},
+]
+
+chart_height = 100
+bar_width = "18"
+gap = 25
+
+bars = G()(
+    Rect(
+        x=str(i * gap + 2),
+        y=str(chart_height - item["value"]),
+        width=bar_width,
+        height=str(item["value"]),
+        _class="bar",
+    )
+    for i, item in enumerate(data)
+)
+
+chart = Svg(
+    width="120",
+    height=str(chart_height),
+    viewBox=f"0 0 120 {chart_height}",
+)(bars)
+
+print(render(chart))
+```
+
+## Example: SVG with gradient
+
+`Defs` holds reusable definitions. `LinearGradient` is placed inside `Defs`, and `Stop` defines each color step. `StopAttributes`: `offset` (str), `stop_color` (str), `stop_opacity` (float, must be `> 0.0` and `<= 1.0`).
+
+```python
+from aether.tags.svg import Svg, Defs, LinearGradient, Stop, Rect
+from aether import render
+
+gradient_svg = Svg(width="200", height="80", viewBox="0 0 200 80")(
+    Defs()(
+        LinearGradient(id="sky", x1="0", x2="1", y1="0", y2="0")(
+            Stop(offset="0%", stop_color="#38bdf8", stop_opacity=1.0),
+            Stop(offset="100%", stop_color="#6366f1", stop_opacity=1.0),
+        ),
+    ),
+    Rect(
+        x="0",
+        y="0",
+        width="200",
+        height="80",
+        rx="8",
+        style="fill: url(#sky)",
+    ),
+)
+
+print(render(gradient_svg))
+```
+
+<Note>
+  `LinearGradient` accepts `x1`, `x2`, `y1`, `y2`, `gradientUnits`,
+  `gradientTransform`, `href`, and `spreadMethod`. Default `gradientUnits`
+  is `"objectBoundingBox"`, so coordinates like `"0"` and `"1"` are
+  relative to the bounding box of the referencing element.
+</Note>
+
+## Example: path-based icon
+
+`PathAttributes` accepts `d` (the path data string) and `pathLength`. Both default to `""`:
+
+```python
+from aether.tags.svg import Svg, Path
+from aether import render
+
+# A simple chevron-right icon
+chevron = Svg(width="24", height="24", viewBox="0 0 24 24")(
+    Path(
+        d="M9 18l6-6-6-6",
+        style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round",
+    ),
+)
+
+print(render(chevron))
+```
+
+## Attribute naming conventions
+
+The same rules that apply to HTML attributes apply to SVG attributes:
+
+- Leading underscores are stripped (`_class` → `class`, `_for` → `for`)
+- All other underscores become hyphens (`stop_color` → `stop-color`)
+- Camel-case attribute names that exist in the source (e.g. `viewBox`, `pathLength`, `gradientUnits`) are passed as-is
+
+```python
+# Python keyword: prefix with underscore
+Circle(_class="dot", cx="10", cy="10", r="5")
+
+# Camel-case SVG attribute: pass exactly as defined
+Svg(viewBox="0 0 100 100", preserveAspectRatio="xMidYMid meet")
+```
+
+See [HTML element reference](/reference/html-tags) for the equivalent HTML conventions.

@@ -1,0 +1,199 @@
+---
+title: "Rendering elements to HTML strings"
+description: "render() converts BaseWebElement instances into a concatenated HTML string. Control HTML escaping with stringify and pass multiple elements in one call."
+---
+
+Once you have composed a tree of elements, call `render()` to produce the final HTML string. This page explains the `render()` function's parameters, how it handles multiple elements, what happens internally during rendering, and how errors surface.
+
+## The render() function
+
+`render()` is imported directly from `aether`:
+
+```python
+from aether import render
+```
+
+**Signature:**
+
+```python
+def render(*elements: BaseWebElement, stringify: bool = True) -> str:
+```
+
+It accepts one or more `BaseWebElement` instances as positional arguments and returns a single `str` (specifically a `SafeString`) containing the concatenated HTML.
+
+## Rendering a single element
+
+```python
+from aether.tags.html import Div, H1, P
+from aether import render
+
+page = Div(_class="container")(
+    H1()("Welcome"),
+    P()("This is a paragraph."),
+)
+
+print(render(page))
+```
+
+Output:
+
+```html
+<div class="container"><h1>Welcome</h1><p>This is a paragraph.</p></div>
+```
+
+## Rendering multiple elements
+
+Pass multiple elements as separate positional arguments. `render()` concatenates them in order with no separator:
+
+```python
+from aether.tags.html import Div, Footer, Header
+from aether import render
+
+header = Header(_class="site-header")("My Site")
+main = Div(_class="content")("Main content here.")
+footer = Footer(_class="site-footer")("© 2025")
+
+print(render(header, main, footer))
+```
+
+Output:
+
+```html
+<header class="site-header">My Site</header><div class="content">Main content here.</div><footer class="site-footer">© 2025</footer>
+```
+
+## The stringify parameter
+
+`stringify` controls whether text content is HTML-escaped:
+
+<AccordionGroup>
+  <Accordion title="stringify=True (default)">
+    All non-element children are passed through `safestring_escape()`, which calls Python's `html.escape()` on plain strings. `SafeString` values are passed through unchanged. This is the safe default for any content that may contain user-supplied text.
+
+    ```python
+    from aether.tags.html import P
+    from aether import render
+
+    p = P()("<script>alert('xss')</script>")
+    print(render(p))
+    # <p>&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;</p>
+    ```
+  </Accordion>
+  <Accordion title="stringify=False">
+    Text content is passed through as-is, without any escaping. Use this only when you have already ensured the content is safe, such as when composing output from other `render()` calls.
+
+    ```python
+    from aether.tags.html import P
+    from aether import render
+
+    already_rendered = "<em>trusted</em>"
+    p = P()(already_rendered)
+    print(render(p, stringify=False))
+    # <p><em>trusted</em></p>
+    ```
+
+    <Warning>
+    `stringify=False` bypasses all escaping. Never pass user-supplied content through `render()` with `stringify=False`. Use `mark_safe` instead if you need to embed a specific trusted fragment while keeping escaping on everywhere else.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## How rendering works internally
+
+Calling `render()` on one or more elements produces a final HTML string via a generator pipeline:
+
+<Steps>
+  <Step title="element.render() produces a generator">
+    Each `BaseWebElement.render()` method yields string chunks. For container elements, it yields the opening tag, then recursively yields from each child via `_render_element()`, then yields the closing tag. For void elements, it yields a single self-closing tag.
+
+    ```
+    <div class="card">  ← opening tag
+      <p>              ← child opening tag
+        Hello          ← text content (escaped)
+      </p>             ← child closing tag
+    </div>             ← closing tag
+    ```
+  </Step>
+  <Step title="_render_element() handles mixed children">
+    `_render_element()` (in `aether.base`) dispatches each child:
+
+    - If the child is a `BaseWebElement`, it calls `child.render()` recursively.
+    - If the child is any other value and `stringify=True`, it calls `safestring_escape()` to escape the value.
+    - If `stringify=False`, the value is yielded as-is.
+    - `None` values are silently skipped.
+  </Step>
+  <Step title="render() joins the chunks">
+    `render()` joins all yielded chunks with an empty `SafeString` (which preserves the `SafeString` type on the result). Multiple elements are also joined in the same way, producing one continuous string.
+  </Step>
+</Steps>
+
+## Container vs void element output
+
+```python
+from aether.tags.html import Br, Div, Img, Input
+from aether import render
+
+# Container: opening tag + children + closing tag
+print(render(Div(_class="box")("content")))
+# <div class="box">content</div>
+
+# Void: self-closing tag, no children
+print(render(Img(src="/logo.png", alt="Logo")))
+# <img src="/logo.png" alt="Logo" />
+
+print(render(Input(type="email", name="email")))
+# <input type="email" name="email" />
+
+print(render(Br()))
+# <br />
+```
+
+## Error handling during rendering
+
+If an exception is raised while rendering a child element, Aether catches it and injects an inline error block in its place rather than crashing the entire render. The error block is a styled `<pre>` element with a red border, followed by a `<script>` that logs the error to the browser console.
+
+```python
+class BadElement(BaseHTMLElement):
+    tag_name = "span"
+    have_children = True
+
+    def render(self, stringify=True):
+        raise RuntimeError("Something went wrong")
+        yield  # make it a generator
+
+from aether import render
+
+output = render(BadElement()("text"))
+# output contains:
+# <pre style="border: solid 1px red; ...">
+#   <code>~~~ Exception: Something went wrong ~~~</code>
+# </pre>
+# <script>console.log("Error: Something went wrong")</script>
+```
+
+<Note>
+The inline error block is intended for development. In production you should ensure rendering exceptions do not occur by validating inputs before constructing elements. Aether does not currently provide a way to suppress the inline error output.
+</Note>
+
+## The return type
+
+`render()` always returns a `SafeString` — a `str` subclass that carries a trust marker indicating the content has already been escaped. This means you can pass the result of `render()` safely to another `render()` call or embed it in a `SafeString`-aware template without double-escaping.
+
+```python
+from aether.tags.html import Div, P
+from aether import render, mark_safe
+
+inner = render(P()("A paragraph."))
+# inner is a SafeString
+
+outer = Div()(inner)
+print(render(outer))
+# <div><p>A paragraph.</p></div>
+# The inner HTML is not double-escaped
+```
+
+## See also
+
+<Card title="Safe strings and HTML escaping" icon="shield" href="/concepts/safe-strings">
+  How SafeString, mark_safe, and safestring_escape work together to control HTML escaping.
+</Card>

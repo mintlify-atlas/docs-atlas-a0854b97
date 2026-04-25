@@ -1,0 +1,212 @@
+---
+title: "Alpine.js integration with Aether"
+description: "Build reactive Alpine.js components in Python using AlpineJSData to serialize state dicts into x-data, x-init, and x-effect directives."
+---
+
+The Alpine.js plugin lets you define reactive component state in Python and serialize it to the Alpine.js directive syntax. Instead of writing inline JavaScript strings by hand, you pass a plain Python dict to `AlpineJSData` and get back a correctly formatted `x-data` (or `x-init`/`x-effect`) value ready to attach to any element.
+
+## Import
+
+```python
+from aether.plugins.alpinejs import (
+    AlpineJSData,
+    alpine_js_data_merge,
+    AlpineHookForm,
+    Statement,
+    AlpineValidationTrigger,
+)
+```
+
+---
+
+## AlpineJSData
+
+`AlpineJSData` is a `str` subclass. Constructing it serializes the provided `data` dict into Alpine JS object syntax. Because it extends `str`, you can pass it directly as an attribute value on any element.
+
+```python
+AlpineJSData(data: dict, directive: Literal["x-data", "x-init", "x-effect"] = "x-data") -> str
+```
+
+<ParamField path="data" type="dict">
+  A mapping of Alpine state keys to values. Supported value types:
+
+  | Python type | Alpine output |
+  |---|---|
+  | `bool` | `true` / `false` (lowercase) |
+  | `str` | Single-quoted string: `'value'` |
+  | `int` / `float` | Numeric literal |
+  | `None` | `null` |
+  | `Statement` | Raw JavaScript (see below) |
+  | `Mapping` | Nested object, recursively serialized |
+  | `Sequence` | Array literal |
+</ParamField>
+
+<ParamField path="directive" type='"x-data" | "x-init" | "x-effect"' default='"x-data"'>
+  Controls the serialization format. `x-data` wraps entries in `{ }` with `:` separators. `x-init` and `x-effect` use `=` separators and no braces.
+</ParamField>
+
+### Basic example
+
+```python
+from aether.plugins.alpinejs import AlpineJSData, Statement
+
+data = AlpineJSData({
+    "open": False,
+    "toggle": Statement("open = !open", "assignment"),
+})
+
+# str(data) == "{ open: false, toggle: open = !open }"
+```
+
+### Using as an element attribute
+
+Pass the `AlpineJSData` string as the value of an `x_data` keyword argument. Because `AlpineJSData` is a `str` subclass, Aether renders it as-is without quoting or escaping:
+
+```python
+from aether.tags.html import Div
+from aether.plugins.alpinejs import AlpineJSData
+from aether import render
+
+data = AlpineJSData({"open": False, "count": 0})
+
+component = Div(**{"x-data": data})(
+    "Component content here"
+)
+
+print(render(component))
+# <div x-data="{ open: false, count: 0 }">Component content here</div>
+```
+
+---
+
+## Statement
+
+`Statement` is a `str` subclass for raw JavaScript expressions that should not be quoted.
+
+```python
+Statement(content: str, seq_type: Literal["assignment", "definition", "instance"])
+```
+
+<ParamField path="content" type="str">
+  The raw JavaScript string to embed.
+</ParamField>
+
+<ParamField path="seq_type" type='"assignment" | "definition" | "instance"'>
+  Controls how the statement is rendered:
+
+  - `"assignment"` — rendered as `key: <content>` (in `x-data`) or `key = <content>` (in `x-init`/`x-effect`)
+  - `"definition"` — rendered as `key <content>` (for function declarations like `function() { ... }`)
+  - `"instance"` — rendered as `<content>` only, without a key prefix (for instantiation expressions)
+</ParamField>
+
+```python
+# Method shorthand
+Statement("function() { this.open = !this.open }", "definition")
+
+# Inline expression
+Statement("open = !open", "assignment")
+
+# Constructor call (no key prefix)
+Statement("new MyClass()", "instance")
+```
+
+---
+
+## alpine_js_data_merge
+
+Merges two `AlpineJSData` objects. Keys in `extra` override keys in `base` when they conflict. Both objects must share the same directive.
+
+```python
+alpine_js_data_merge(
+    base: AlpineJSData | None,
+    extra: AlpineJSData | None,
+) -> AlpineJSData | None
+```
+
+```python
+from aether.plugins.alpinejs import AlpineJSData, alpine_js_data_merge
+
+base = AlpineJSData({"open": False, "count": 0})
+extra = AlpineJSData({"count": 5, "label": "hello"})
+
+merged = alpine_js_data_merge(base, extra)
+# { open: false, count: 5, label: 'hello' }
+```
+
+<Warning>
+  Merging two `AlpineJSData` objects with different directives (e.g. `x-data` and `x-init`) raises a `TypeError`.
+</Warning>
+
+If either argument is `None`, the other is returned unchanged. If both are `None`, returns `None`.
+
+---
+
+## AlpineValidationTrigger
+
+An enum of DOM event strings used as validation trigger values in `AlpineHookForm`.
+
+| Member | Value |
+|---|---|
+| `ON_BLUR` | `@blur` |
+| `ON_CHANGE` | `@change` |
+| `ON_EFFECT` | `x-effect` |
+| `ON_INPUT` | `@input` |
+
+```python
+from aether.plugins.alpinejs import AlpineValidationTrigger
+
+trigger = AlpineValidationTrigger.ON_BLUR  # "@blur"
+```
+
+---
+
+## AlpineHookForm
+
+A Pydantic model representing a single form field's Alpine-driven validation configuration. Pass a list of `AlpineHookForm` instances as a value inside an `AlpineJSData` dict to generate the full validation state.
+
+<ParamField path="name" type="str | None" default="None">
+  The field name, used to identify the input.
+</ParamField>
+
+<ParamField path="required" type="bool | None" default="None">
+  Whether the field is required.
+</ParamField>
+
+<ParamField path="validator" type="_AlpineHookFormValidator">
+  Validation configuration. Defaults to `{ validation_trigger: AlpineValidationTrigger.ON_BLUR }`.
+
+  Keys:
+  - `validation_trigger` (`AlpineValidationTrigger`) — when to run validation
+  - `value_to_validate` (`str`, optional) — Alpine expression for the value
+  - `validation_rules` (`list`, optional) — list of `{ test: str, message: str }` rules
+</ParamField>
+
+<ParamField path="constraints" type="_AlpineHookFormConstraints">
+  HTML constraint attributes. Each constraint is a dict with `value` and an optional `message`. Supported keys: `min`, `max`, `min_length`, `max_length`, `step`, `type`.
+</ParamField>
+
+```python
+from aether.plugins.alpinejs import AlpineHookForm, AlpineValidationTrigger
+
+field = AlpineHookForm(
+    name="email",
+    required=True,
+    validator={
+        "validation_trigger": AlpineValidationTrigger.ON_BLUR,
+        "value_to_validate": "email",
+        "validation_rules": [
+            {"test": "email.includes('@')", "message": "Enter a valid email address"},
+        ],
+    },
+    constraints={
+        "max_length": {"value": 254},
+    },
+)
+```
+
+---
+
+## Related
+
+- [Elements reference](/concepts/elements)
+- [HTMX plugin](/plugins/htmx)

@@ -1,0 +1,181 @@
+---
+title: "Aether public API reference"
+description: "Complete reference for Aether's top-level public API: render(), mark_safe(), BaseWebElement, BaseAttribute, WebElementType, and the current version."
+---
+
+`aether` exposes a small, focused public API surface. Everything needed to build, compose, and render HTML or SVG is available from the top-level package. The sections below document each export with its signature, parameters, and return type.
+
+```python
+from aether import render, mark_safe, BaseWebElement, BaseAttribute, WebElementType
+```
+
+---
+
+## `render()`
+
+Renders one or more element trees to a single HTML string.
+
+```python
+from aether import render
+from aether.tags.html import Div, P
+
+html = render(
+    Div(_class="container")(
+        P()("Hello, world!"),
+    )
+)
+# '<div class="container"><p>Hello, world!</p></div>'
+```
+
+<ParamField path="*elements" type="BaseWebElement" required>
+  One or more `BaseWebElement` instances to render. Multiple elements are concatenated in order.
+</ParamField>
+
+<ParamField path="stringify" type="bool" default="True">
+  When `True` (the default), text content passed as children is HTML-escaped before rendering. Set to `False` to pass raw string values through without escaping. Has no effect on children that are already `SafeString` instances (produced by `mark_safe()`).
+</ParamField>
+
+**Returns:** `SafeString` — the concatenated HTML output of all elements.
+
+---
+
+## `mark_safe()`
+
+Marks a string as safe to bypass HTML escaping during `render()`.
+
+```python
+from aether import mark_safe, render
+from aether.tags.html import Div
+
+safe_html = mark_safe("<strong>pre-rendered</strong>")
+render(Div()(safe_html))
+# '<div><strong>pre-rendered</strong></div>'
+```
+
+<Warning>
+  Only pass trusted content to `mark_safe()`. Passing user-supplied input will create an XSS vulnerability.
+</Warning>
+
+<ParamField path="string" type="str | SafeString" required>
+  The string to mark as safe. If the input already has an `__html__()` method (i.e., is already a `SafeString`), it is returned unchanged.
+</ParamField>
+
+**Returns:** `SafeString` — a `str` subclass that signals to `render()` that no further escaping is needed.
+
+---
+
+## `BaseWebElement`
+
+Base class for all HTML and SVG element classes. You do not instantiate `BaseWebElement` directly; instead, element classes (such as `Div`, `Svg`, `Circle`) extend it.
+
+```python
+from aether.tags.html import Div
+
+el = Div(_class="box", id="main")("child text")
+```
+
+### Class attributes
+
+<ResponseField name="tag_name" type="str">
+  The HTML or SVG tag name rendered in the output (e.g., `"div"`, `"circle"`).
+</ResponseField>
+
+<ResponseField name="have_children" type="bool">
+  `True` if the element accepts child nodes. Void elements (e.g., `Img`, `Input`, `Br`) have `have_children = False` and render as self-closing tags. Calling a void element with children emits a `UserWarning`.
+</ResponseField>
+
+<ResponseField name="web_element_type" type="WebElementType">
+  The element namespace: `WebElementType.HTML`, `WebElementType.SVG`, or `WebElementType.MATHML`.
+</ResponseField>
+
+<ResponseField name="content_category" type="tuple | None">
+  The HTML content categories the element belongs to (e.g., flow content, phrasing content). `None` for SVG elements.
+</ResponseField>
+
+### `__init__(**attributes)`
+
+Accepts keyword arguments as element attributes. Attribute names are normalized at instantiation: a single leading underscore is stripped (allowing `_class` → `class`), and remaining underscores are replaced with hyphens (`data_value` → `data-value`). Attributes with `None` values or boolean `False` are omitted from output.
+
+### `__call__(*children)`
+
+Adds children to the element and returns `self`, enabling fluent chaining. Accepted child types: `str`, `BaseWebElement`, generators, iterables, and `None` (which is silently ignored).
+
+```python
+Div()(
+    "plain text",
+    P()("nested element"),
+    (Span()(s) for s in ["a", "b"]),  # generator
+    None,  # ignored
+)
+```
+
+### `render(stringify=True)`
+
+Generator that yields HTML string fragments for the element and all its children. In normal usage you call the top-level `render()` function, which calls this method internally.
+
+<ParamField path="stringify" type="bool" default="True">
+  Passed through to child rendering. When `True`, text children are HTML-escaped.
+</ParamField>
+
+**Yields:** `str` fragments that concatenate to the full element HTML.
+
+---
+
+## `BaseAttribute`
+
+Base class for element-specific attribute TypedDicts. Each element exports a corresponding `*Attributes` TypedDict (e.g., `DivAttributes`, `ButtonAttributes`) that extends this class.
+
+```python
+from aether.tags.html import DivAttributes
+
+attrs: DivAttributes = {"id": "main", "_class": "container"}
+```
+
+`BaseAttribute` is configured with `pydantic_config = ConfigDict(extra="allow")`, which means arbitrary additional attributes beyond those declared in the TypedDict are permitted. This allows data attributes, ARIA attributes, and any other valid HTML/SVG attribute.
+
+### `validate(data, default_values, custom_validators)`
+
+Class method that validates an attribute dictionary against the TypedDict schema using Pydantic.
+
+<ParamField path="data" type="dict" required>
+  The attribute dictionary to validate.
+</ParamField>
+
+<ParamField path="default_values" type="dict">
+  Default values to merge before validation.
+</ParamField>
+
+<ParamField path="custom_validators" type="list[ValidatorFunction] | None">
+  A list of callable validator functions that run after Pydantic validation. Each callable receives the validated attribute dict and may raise `ValidationError` to reject invalid combinations.
+</ParamField>
+
+---
+
+## `WebElementType`
+
+`StrEnum` that identifies the namespace of an element. Used by rendering logic to determine how to handle void elements and namespace differences.
+
+| Member | Value |
+|---|---|
+| `WebElementType.HTML` | `"html"` |
+| `WebElementType.SVG` | `"svg"` |
+| `WebElementType.MATHML` | `"mathml"` |
+
+```python
+from aether import WebElementType
+from aether.tags.svg import Svg
+
+assert Svg.web_element_type == WebElementType.SVG
+```
+
+---
+
+## Version
+
+```python
+from aether import __version__
+
+print(__version__)  # "0.4.21"
+```
+
+The current release is **0.4.21**. See the [changelog](/reference/changelog) for version history and the pinning recommendation for pre-1.0.0 releases.

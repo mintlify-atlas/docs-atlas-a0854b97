@@ -1,0 +1,79 @@
+---
+title: "Aether: Python DSL for HTML user interfaces"
+description: "Aether lets you build composable HTML components as Python objects with typed attributes, automatic HTML escaping, and HTMX/Alpine.js/Tailwind support."
+---
+
+Aether is a Python DSL for building HTML user interfaces. This page explains what Aether is, what makes it different from traditional templating approaches, and where to go next to start using it.
+
+## What is Aether?
+
+Aether lets you construct HTML components using plain Python objects. Instead of writing template strings or mixing HTML markup into your code, you compose elements by instantiating Python classes and calling them with children. Aether then renders clean, valid HTML output.
+
+```python
+from aether.tags.html import H1, Div, P
+from aether import render
+
+page = Div(_class="container")(
+    H1()("My Awesome Page"),
+    P()("This is a paragraph of text.")
+)
+
+print(render(page))
+```
+
+Each element is a Python class. Attributes are keyword arguments. Children are passed via the call syntax. The result is a composable, reusable component tree — no template engine required.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Typed attributes" icon="shield-check" href="/concepts/attributes">
+    Every HTML element validates its attributes using Pydantic. Invalid attribute values raise errors before anything is rendered, so mistakes surface at development time, not at runtime.
+  </Card>
+  <Card title="Safe by default" icon="lock" href="/concepts/safe-strings">
+    All string content is HTML-escaped automatically. Use `mark_safe` only when you explicitly want to inject raw HTML — everything else is escaped without any extra work.
+  </Card>
+  <Card title="HTMX, Alpine.js, and Tailwind" icon="plug" href="/plugins/htmx">
+    Aether handles hyphenated attributes natively, so HTMX (`hx-get`, `hx-target`) and Alpine.js (`x-data`, `x-on`) attributes work as regular Python keyword arguments. Tailwind class names work as-is.
+  </Card>
+  <Card title="SVG support" icon="vector-square" href="/guides/svg">
+    Build inline SVG components using the same composable element API as HTML. SVG elements live in a separate namespace and can be mixed freely with HTML components.
+  </Card>
+</CardGroup>
+
+## Attribute naming convention
+
+Python does not allow hyphens in keyword argument names, so Aether converts argument names to HTML attribute names automatically:
+
+- A **leading underscore is stripped**: `_class` → `class`, `_id` → `id`
+- **Underscores become hyphens**: `hx_get` → `hx-get`, `data_value` → `data-value`
+
+This means you can pass any HTML or HTMX attribute as a standard Python keyword argument without string workarounds.
+
+## Version stability
+
+<Warning>
+Aether has not yet reached `v1.0.0`. **Minor version updates (e.g., `0.1.x` → `0.2.x`) may introduce breaking changes** as the API is refined. Patch updates (`0.1.1` → `0.1.2`) are backwards compatible within the same minor version.
+
+Pin your dependency to a specific minor version and review the release notes before upgrading to a new minor version.
+
+```
+pyaether>=0.4,<0.5
+```
+</Warning>
+
+## What to read next
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="box" href="/installation">
+    Install Aether from PyPI and verify your setup.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first component end to end in a few minutes.
+  </Card>
+  <Card title="Elements" icon="code" href="/concepts/elements">
+    Understand how HTML elements map to Python classes.
+  </Card>
+  <Card title="Attributes" icon="tag" href="/concepts/attributes">
+    Learn how attributes are validated and converted.
+  </Card>
+</CardGroup>

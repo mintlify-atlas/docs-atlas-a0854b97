@@ -1,81 +1,135 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
-icon: 'rocket'
+description: "Build your first HTML component with Aether in minutes — import elements, compose a tree, render output, and add HTMX interactivity."
 ---
 
-## Get started in three steps
+This guide walks you through building and rendering HTML components with Aether from scratch. By the end you will have a working component, understand how dynamic content works, and see how to wire up HTMX attributes.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Install Aether">
+    Install `pyaether` from PyPI:
 
-### Step 1: Set up your local environment
+    ```bash
+    pip install pyaether
+    ```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    Aether requires Python 3.10 or later. See [Install Aether](/installation) for full requirements and dependency pinning guidance.
+  </Step>
 
-### Step 2: Deploy your changes
+  <Step title="Import elements">
+    Aether organises HTML elements as Python classes under `aether.tags.html`. Import the elements you need alongside the `render` function:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```python
+    from aether.tags.html import H1, Div, P
+    from aether import render
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    Every standard HTML5 element is available. The full list is in the [HTML tags reference](/reference/html-tags).
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Build a component">
+    Construct a component by instantiating an element with its attributes, then calling it with its children:
 
-### Step 3: Go live
+    ```python
+    page = Div(_class="container")(
+        H1()("My Awesome Page"),
+        P()("This is a paragraph of text.")
+    )
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    The two-step syntax — `Element(**attributes)(children)` — separates attribute declaration from child composition. Attributes are keyword arguments; children are positional arguments in the call.
+
+    **Attribute naming:** Python does not allow hyphens in keyword argument names, so Aether converts them automatically:
+    - Leading underscore is stripped: `_class` → `class`, `_id` → `id`
+    - Underscores become hyphens: `hx_get` → `hx-get`, `data_value` → `data-value`
+  </Step>
+
+  <Step title="Render to HTML">
+    Pass your component to `render()` to get an HTML string:
+
+    ```python
+    print(render(page))
+    ```
+
+    Output:
+
+    ```html
+    <div class="container"><h1>My Awesome Page</h1><p>This is a paragraph of text.</p></div>
+    ```
+
+    All string content is HTML-escaped automatically. See [Safe strings](/concepts/safe-strings) for details on the escaping behaviour and `mark_safe`.
+  </Step>
+</Steps>
+
+## Dynamic content
+
+Because components are plain Python, you can use loops, conditionals, and comprehensions to build dynamic content. Generator expressions are supported directly in the call syntax:
+
+```python
+from aether.tags.html import Div, Li, Span, Ul
+from aether import render
+
+items = ["apple", "banana", "cherry"]
+item_list = Ul()(Li()(item) for item in items)
+
+name = "Alice"
+greeting = Span()(f"Hello, {name}!")
+
+print(render(Div()(greeting, item_list)))
+```
+
+Output:
+
+```html
+<div><span>Hello, Alice!</span><ul><li>apple</li><li>banana</li><li>cherry</li></ul></div>
+```
+
+You can pass any iterable — lists, generator expressions, or custom iterators — as children.
+
+## HTMX integration
+
+Aether's attribute naming convention makes HTMX attributes straightforward. Any `hx_*` keyword argument becomes the corresponding `hx-*` HTML attribute:
+
+```python
+from aether.tags.html import Button, Div, Img
+from aether import render
+
+click_to_load = Div(id="replace_me")(
+    Button(
+        _class="btn primary",
+        hx_get="/example/?data=1",
+        hx_target="#replace_me",
+        hx_swap="outerHTML",
+    )(
+        "Load More Data...",
+        Img(_class="htmx-indicator", src="/img/bars.svg", alt="Loading..."),
+    )
+)
+
+print(render(click_to_load))
+```
+
+Output:
+
+```html
+<div id="replace_me"><button class="btn primary" hx-get="/example/?data=1" hx-target="#replace_me" hx-swap="outerHTML" type="button">Load More Data...<img class="htmx-indicator" src="/img/bars.svg" alt="Loading..." /></button></div>
+```
+
+The same convention works for Alpine.js (`x_data` → `x-data`), `data_*` attributes, and any other hyphenated attribute. See [HTMX](/plugins/htmx) and [Alpine.js](/plugins/alpinejs) for full integration guides.
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Core concepts" icon="book" href="/concepts/elements">
+    Understand how elements, attributes, and rendering work in depth.
+  </Card>
+  <Card title="HTMX" icon="plug" href="/plugins/htmx">
+    Full guide to using HTMX attributes with Aether.
+  </Card>
+  <Card title="Dynamic content" icon="arrows-rotate" href="/guides/dynamic-content">
+    Patterns for loops, conditionals, and reusable components.
+  </Card>
+  <Card title="SVG" icon="vector-square" href="/guides/svg">
+    Build inline SVG using the same composable API.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

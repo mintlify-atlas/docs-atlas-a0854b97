@@ -1,0 +1,197 @@
+---
+title: "Attribute handling and validation"
+description: "Aether attributes are typed TypedDicts validated by Pydantic. Naming conventions convert Python keyword arguments to valid HTML attribute names automatically."
+---
+
+When you pass keyword arguments to an element, Aether validates them against a typed `TypedDict` subclass using Pydantic, then converts the Python names to the HTML attribute names that appear in the rendered output. This page explains the attribute type system, the naming conventions, how boolean and `None` values are handled, and how to write custom validators.
+
+## Attribute TypedDicts
+
+Every element class has a corresponding attributes class that extends `GlobalHTMLAttributes` (and ultimately `BaseAttribute`). For example:
+
+- `Div` → `DivAttributes`
+- `Button` → `ButtonAttributes`
+
+These are standard `TypedDict` subclasses. Fields are `NotRequired` unless the element mandates them. Pydantic's `TypeAdapter` validates the dictionary before any rendering happens, so type errors surface at the point of element construction, not at render time.
+
+```python
+from aether.tags.html import Div
+
+# Valid — _class is a NotRequired[str]
+Div(_class="container")
+
+# Invalid — _class must be a string
+try:
+    Div(_class=42)
+except ValueError as e:
+    print(e)
+```
+
+## GlobalHTMLAttributes
+
+`GlobalHTMLAttributes` (from `aether.tags.html._base`) defines the attributes available on every HTML element. The full set includes:
+
+| Python name | HTML attribute | Type |
+| --- | --- | --- |
+| `id` | `id` | `str` |
+| `_class` | `class` | `str` |
+| `style` | `style` | `str` |
+| `hidden` | `hidden` | `bool \| "until-found"` |
+| `draggable` | `draggable` | `bool` |
+| `role` | `role` | `str` |
+| `tabindex` | `tabindex` | `int` |
+| `lang` | `lang` | `str` |
+| `title` | `title` | `str` |
+| `autofocus` | `autofocus` | `bool` |
+| `contenteditable` | `contenteditable` | `"true" \| "false" \| "plaintext-only"` |
+| `dir` | `dir` | `"ltr" \| "rtl" \| "auto"` |
+| `inputmode` | `inputmode` | `"none" \| "text" \| "decimal" \| ...` |
+| `spellcheck` | `spellcheck` | `"true" \| "false"` |
+| `translate` | `translate` | `"yes" \| "no"` |
+
+All fields are `NotRequired`. Element-specific attributes (such as `src` on `Img` or `type` on `Button`) are defined in the element's own attributes class on top of these globals.
+
+<Tip>
+Because `BaseAttribute` sets `extra="allow"` via Pydantic's `ConfigDict`, you can pass any arbitrary attribute not defined in the TypedDict — for example `hx_get` for HTMX or `data_value` for data attributes — and it will pass validation and be rendered.
+</Tip>
+
+## Naming conventions
+
+Python does not allow hyphens in keyword argument names, and `class` is a reserved word. Aether applies two transformations to every attribute name:
+
+<Steps>
+  <Step title="Strip the leading underscore">
+    A single leading underscore is removed. This lets you pass reserved Python keywords as attribute names.
+
+    ```python
+    Div(_class="container", _id="main")
+    # renders: class="container" id="main"
+    ```
+  </Step>
+  <Step title="Convert underscores to hyphens">
+    All remaining underscores become hyphens. This covers HTMX, Alpine.js, `data-*`, and any other hyphenated attribute.
+
+    ```python
+    Button(hx_get="/load", hx_target="#result", data_user_id="42")
+    # renders: hx-get="/load" hx-target="#result" data-user-id="42"
+    ```
+  </Step>
+</Steps>
+
+These transformations are applied in `BaseWebElement.__init__` using a regex substitution before the attributes dictionary is stored.
+
+## None values
+
+Passing `None` as an attribute value removes the attribute entirely from the output. This is useful for conditional attributes:
+
+```python
+from aether.tags.html import Div
+from aether import render
+
+is_active = False
+
+div = Div(
+    _class="card",
+    id="card-1" if is_active else None,
+)
+
+print(render(div))
+# <div class="card"></div>
+```
+
+The `None` check happens in `__init__`, so the key never enters the attributes dictionary.
+
+## Boolean attributes
+
+Boolean attribute values follow HTML semantics:
+
+- `True` renders the **bare attribute name** (no value), which is the correct HTML form for boolean attributes like `hidden`, `disabled`, `autofocus`.
+- `False` **suppresses the attribute entirely** — it is not rendered at all.
+
+```python
+from aether.tags.html import Button, Div
+from aether import render
+
+print(render(Div(hidden=True)("Hidden content")))
+# <div hidden>Hidden content</div>
+
+print(render(Div(hidden=False)("Visible content")))
+# <div>Visible content</div>
+
+print(render(Button(type="submit", disabled=True)("Submit")))
+# <button type="submit" disabled>Submit</button>
+```
+
+<Note>
+The `value` attribute on `Button` (and other form elements) is an exception — it is always rendered as `value="..."` even when the value is a boolean. This special case is handled in `flatten_attributes`.
+</Note>
+
+## Pydantic validation
+
+Validation runs via `validate_dictionary_data` in `aether.utils`, which calls `pydantic.TypeAdapter(AttributeClass).validate_python(data)`. If validation fails, a `ValueError` is raised with a formatted message that identifies the invalid field, its type, and the input value.
+
+```python
+from aether.tags.html import Button
+
+try:
+    # type is required and must be "button", "submit", or "reset"
+    Button(type="invalid")
+except ValueError as e:
+    print(e)
+# `type`: Input should be 'button', 'submit' or 'reset'. (type: 'literal_error', ...)
+```
+
+## Custom validators
+
+Element classes can register custom validator functions that run after Pydantic validation. `Button` uses this to enforce that form-related attributes (`formaction`, `formenctype`, `formmethod`, `formnovalidate`, `formtarget`) are not set when `type="button"`:
+
+```python
+from aether.tags.html import Button
+
+# This raises ValueError because formaction is not allowed
+# when type is "button" (the default)
+try:
+    Button(type="button", formaction="/submit")
+except ValueError as e:
+    print(e)
+# `formaction`: `Formaction` is not allowed when `type` is `button`.
+
+# formaction is valid when type is "submit"
+btn = Button(type="submit", formaction="/submit")("Submit")
+```
+
+Custom validators receive the validated attribute dictionary and raise `aether.errors.ValidationError` when a rule is violated.
+
+## The escape_quote parameter
+
+`BaseWebElement.__init__` accepts an `escape_quote` keyword argument (default `True`). When `True`, quote characters inside attribute values are HTML-escaped (`"` → `&quot;`). Set it to `False` only when you are certain the attribute values do not require quote escaping.
+
+```python
+from aether.tags.html import Div
+from aether import render
+
+# Default: quotes inside attribute values are escaped
+div = Div(title='Say "hello"')()
+print(render(div))
+# <div title="Say &quot;hello&quot;"></div>
+
+# escape_quote=False: quotes are passed through unchanged
+div_raw = Div(escape_quote=False, title='Say "hello"')()
+print(render(div_raw))
+# <div title="Say "hello""></div>  (invalid HTML — use with care)
+```
+
+<Warning>
+Setting `escape_quote=False` can produce invalid HTML if the attribute value contains double-quote characters. Only use it when you are sure the values are safe.
+</Warning>
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="HTML elements in Aether" icon="code" href="/concepts/elements">
+    How elements are structured as Python classes and the two-step call syntax.
+  </Card>
+  <Card title="HTML tags reference" icon="list" href="/reference/html-tags">
+    Per-element attribute reference with types and valid values.
+  </Card>
+</CardGroup>

@@ -1,0 +1,91 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Aether",
+  "projectDescription": "A Python DSL for building HTML user interfaces using component-based Python objects, with built-in support for SVG, MathML, HTMX, Alpine.js, Tailwind CSS, and Chart.js.",
+  "theme": "luma",
+  "primaryColor": "#4F6EF7",
+  "lightColor": "#EEF1FE",
+  "darkColor": "#1A2266",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/elements",
+              "concepts/attributes",
+              "concepts/rendering",
+              "concepts/safe-strings"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/dynamic-content",
+              "guides/components",
+              "guides/forms",
+              "guides/svg"
+            ]
+          },
+          {
+            "group": "Plugins",
+            "pages": [
+              "plugins/htmx",
+              "plugins/alpinejs",
+              "plugins/tailwindcss",
+              "plugins/chartjs"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/html-tags",
+              "reference/svg-tags",
+              "reference/api",
+              "reference/changelog"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Full HTML5 tag coverage with typed attribute validation via Pydantic",
+    "Component-based composable element tree using Python's call syntax",
+    "Automatic HTML escaping with explicit SafeString opt-out for trusted content",
+    "SVG and MathML element support alongside HTML",
+    "HTMX integration via HTMXAttributes TypedDict mixin",
+    "Alpine.js integration with AlpineJSData helper for reactive state",
+    "Tailwind CSS class merging with tw_merge() for conflict resolution",
+    "Chart.js configuration helpers via ChartJSConfig Pydantic models"
+  ],
+  "publicApiSurface": [
+    "render(*elements, stringify=True) -> str",
+    "BaseWebElement",
+    "BaseAttribute",
+    "WebElementType",
+    "mark_safe(string) -> SafeString",
+    "aether.tags.html.* (all HTML5 elements)",
+    "aether.tags.svg.* (SVG elements: Svg, Circle, Rect, Path, G, etc.)",
+    "aether.tags.mathml.* (MathML elements)",
+    "aether.plugins.htmx.HTMXAttributes",
+    "aether.plugins.alpinejs.AlpineJSData",
+    "aether.plugins.alpinejs.alpine_js_data_merge()",
+    "aether.plugins.alpinejs.AlpineHookForm",
+    "aether.plugins.alpinejs.Statement",
+    "aether.plugins.tailwindcss.tw_merge(*tw_classes) -> str",
+    "aether.plugins.chartjs.ChartJSConfig",
+    "aether.plugins.chartjs.ChartJSDataset",
+    "aether.plugins.chartjs.build_chart_config_from_attributes()"
+  ]
+}

@@ -1,0 +1,209 @@
+---
+title: "Building reusable components with Aether"
+description: "Create reusable UI building blocks using plain Python functions and classes — no framework, decorators, or special APIs required."
+---
+
+Because Aether elements are ordinary Python objects, any Python function or class can act as a component. There is no special registration, decorator, or base class to inherit from — if it returns a `BaseWebElement` (or calls `render()`), it is a component.
+
+## Function components
+
+The simplest component is a function that builds and returns an element tree:
+
+```python
+from aether.tags.html import Div, H2, P
+from aether.base import BaseWebElement
+
+def alert(message: str, kind: str = "info") -> BaseWebElement:
+    return Div(_class=f"alert alert--{kind}")(
+        P()(message)
+    )
+```
+
+Call it like any other Python function and pass the result as a child:
+
+```python
+from aether import render
+
+page = Div()(
+    alert("Your profile has been saved.", kind="success"),
+    alert("Email address is required.", kind="error"),
+)
+
+print(render(page))
+```
+
+## Class components
+
+A class with a `render()` method is a natural fit when a component carries state or has several configuration options:
+
+```python
+from aether.tags.html import Div, H2, P, A
+from aether.base import BaseWebElement
+
+class Card:
+    def __init__(
+        self,
+        title: str,
+        body: str,
+        href: str | None = None,
+        footer_text: str | None = None,
+    ) -> None:
+        self.title = title
+        self.body = body
+        self.href = href
+        self.footer_text = footer_text
+
+    def render(self) -> BaseWebElement:
+        heading = (
+            A(href=self.href)(H2()(self.title))
+            if self.href
+            else H2()(self.title)
+        )
+        footer = (
+            Div(_class="card__footer")(self.footer_text)
+            if self.footer_text
+            else None
+        )
+        return Div(_class="card")(
+            Div(_class="card__header")(heading),
+            Div(_class="card__body")(P()(self.body)),
+            footer,
+        )
+```
+
+Use it by calling `.render()`:
+
+```python
+from aether import render
+
+card = Card(
+    title="Getting started",
+    body="Install Aether and build your first component.",
+    href="/guides/quickstart",
+    footer_text="5 min read",
+)
+
+print(render(card.render()))
+```
+
+## Composing components
+
+Pass the output of one component as the child of another, just as you would any element:
+
+```python
+from aether.tags.html import Main, Section, H1
+
+def page_layout(title: str, *sections: BaseWebElement) -> BaseWebElement:
+    return Main()(
+        H1()(title),
+        *sections,
+    )
+
+content = page_layout(
+    "Products",
+    card.render(),
+    alert("Showing 3 of 12 results.", kind="info"),
+)
+```
+
+## Parameterized components with defaults
+
+Use Python default arguments, `*args`, or keyword-only arguments to make components flexible without extra complexity:
+
+```python
+from aether.tags.html import Button
+
+def action_button(
+    label: str,
+    *,
+    variant: str = "primary",
+    disabled: bool = False,
+) -> BaseWebElement:
+    return Button(
+        type="button",
+        _class=f"btn btn--{variant}",
+        disabled=disabled or None,   # None removes the attribute entirely
+    )(label)
+```
+
+<Note>
+  Passing `None` for an attribute removes it from the rendered HTML.
+  Use `disabled=disabled or None` to conditionally omit boolean attributes.
+</Note>
+
+## Example: Card component
+
+```python
+from aether.tags.html import Div, H2, P, A
+from aether.base import BaseWebElement
+
+def card(
+    title: str,
+    body: str,
+    footer: str | None = None,
+    href: str | None = None,
+) -> BaseWebElement:
+    header_content = A(href=href)(title) if href else title
+    return Div(_class="card")(
+        Div(_class="card__header")(H2()(header_content)),
+        Div(_class="card__body")(P()(body)),
+        Div(_class="card__footer")(footer) if footer else None,
+    )
+```
+
+## Example: NavBar component
+
+```python
+from aether.tags.html import Nav, Ul, Li, A
+from aether.base import BaseWebElement
+
+def navbar(links: list[dict], active_href: str = "") -> BaseWebElement:
+    def nav_item(link: dict) -> BaseWebElement:
+        is_active = link["href"] == active_href
+        return Li(_class="nav__item nav__item--active" if is_active else "nav__item")(
+            A(href=link["href"])(link["label"])
+        )
+
+    return Nav(_class="navbar")(
+        Ul(_class="navbar__list")(nav_item(link) for link in links)
+    )
+```
+
+Usage:
+
+```python
+from aether import render
+
+links = [
+    {"href": "/", "label": "Home"},
+    {"href": "/docs", "label": "Docs"},
+    {"href": "/blog", "label": "Blog"},
+]
+
+print(render(navbar(links, active_href="/docs")))
+```
+
+## Example: Button component with predefined styling
+
+```python
+from aether.tags.html import Button, Span
+from aether.base import BaseWebElement
+from typing import Literal
+
+def icon_button(
+    label: str,
+    icon: str,
+    variant: Literal["primary", "secondary", "danger"] = "primary",
+    type: Literal["button", "submit", "reset"] = "button",
+) -> BaseWebElement:
+    return Button(type=type, _class=f"btn btn--{variant}")(
+        Span(_class="btn__icon")(icon),
+        Span(_class="btn__label")(label),
+    )
+```
+
+<Tip>
+  Components are just Python — reach for dataclasses, `attrs`, or `pydantic` models
+  when you want validated configuration, typed fields with defaults, or easy
+  serialization alongside your element trees.
+</Tip>

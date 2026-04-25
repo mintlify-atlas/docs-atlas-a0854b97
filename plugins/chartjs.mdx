@@ -1,0 +1,259 @@
+---
+title: "Chart.js configuration helpers in Aether"
+description: "Use ChartJSConfig Pydantic models to build validated Chart.js configuration objects in Python, then serialize to JSON for embedding in script tags."
+---
+
+The Chart.js plugin provides a set of Pydantic models that mirror the Chart.js configuration schema. You construct the config tree in Python—with full type checking and IDE completion—then call `.model_dump(mode="json")` to get a plain dict ready to serialize into a `<script>` tag.
+
+## Import
+
+```python
+from aether.plugins.chartjs import (
+    ChartJSConfig,
+    ChartJSDataset,
+    ChartJSData,
+    ChartJSOptions,
+    build_chart_config_from_attributes,
+)
+```
+
+---
+
+## Model reference
+
+### ChartJSConfig
+
+The top-level configuration object passed to `new Chart(ctx, config)`.
+
+<ParamField path="type" type="str" default='"bar"'>
+  Chart type. Common values: `"bar"`, `"line"`, `"pie"`, `"doughnut"`, `"radar"`, `"scatter"`, `"bubble"`.
+</ParamField>
+
+<ParamField path="data" type="ChartJSData">
+  Labels and datasets.
+</ParamField>
+
+<ParamField path="options" type="ChartJSOptions">
+  Responsiveness, plugins (legend/tooltip/title), scales, and interaction settings.
+</ParamField>
+
+---
+
+### ChartJSData
+
+<ParamField path="labels" type="list[Any]" default="[]">
+  X-axis category labels (or labels for pie/doughnut segments).
+</ParamField>
+
+<ParamField path="datasets" type="list[ChartJSDataset]" default="[]">
+  One or more dataset objects.
+</ParamField>
+
+---
+
+### ChartJSDataset
+
+Accepts extra fields (`model_config = extra="allow"`) so any Chart.js dataset property can be passed through.
+
+<ParamField path="label" type="str | None" required>
+  Dataset name shown in the legend.
+</ParamField>
+
+<ParamField path="data" type="list[Any]" required>
+  Data values. For bar/line charts these are numbers; for scatter charts they are `{x, y}` dicts.
+</ParamField>
+
+<ParamField path="backgroundColor" type="str | list[str] | None">
+  Fill color. Pass a list to assign per-bar/segment colors.
+</ParamField>
+
+<ParamField path="borderColor" type="str | list[str] | None">
+  Border/line color.
+</ParamField>
+
+<ParamField path="borderWidth" type="int" default="2">
+  Border width in pixels.
+</ParamField>
+
+<ParamField path="tension" type="float | None">
+  Bezier curve tension for line charts (`0` = straight lines, `0.4` = smooth).
+</ParamField>
+
+<ParamField path="fill" type="bool | None">
+  Whether to fill the area under a line chart.
+</ParamField>
+
+<ParamField path="pointRadius" type="int | None">
+  Radius of data point markers on line/radar charts.
+</ParamField>
+
+<ParamField path="order" type="int | None">
+  Draw order. Lower values are drawn first (behind).
+</ParamField>
+
+<ParamField path="type" type="str | None">
+  Per-dataset chart type override (e.g. `"line"` in a `"bar"` chart for mixed charts).
+</ParamField>
+
+<ParamField path="yAxisID" type='"y" | "y1" | None'>
+  Assigns the dataset to a specific Y axis for dual-axis charts.
+</ParamField>
+
+---
+
+### ChartJSOptions
+
+<ParamField path="responsive" type="bool" default="True">
+  Resizes the canvas when the container size changes.
+</ParamField>
+
+<ParamField path="maintainAspectRatio" type="bool" default="False">
+  Preserves the original canvas aspect ratio on resize.
+</ParamField>
+
+<ParamField path="plugins" type="ChartJSPlugins">
+  Legend, tooltip, and title configuration.
+</ParamField>
+
+<ParamField path="scales" type="ChartJSScales | None">
+  Axis configuration. Set automatically by `build_chart_config_from_attributes` for chart types that support axes.
+</ParamField>
+
+---
+
+### ChartJSScales
+
+<ParamField path="x" type="ChartJSAxis">
+  Primary X axis.
+</ParamField>
+
+<ParamField path="y" type="ChartJSAxis">
+  Primary Y axis.
+</ParamField>
+
+<ParamField path="x1" type="ChartJSAxis | None" default="None">
+  Secondary X axis (supported for `"line"` and `"scatter"` charts).
+</ParamField>
+
+<ParamField path="y1" type="ChartJSAxis | None" default="None">
+  Secondary Y axis.
+</ParamField>
+
+Each axis is a `ChartJSAxis` with fields: `beginAtZero` (default `True`), `stacked`, `type` (`"linear"`, `"logarithmic"`, `"category"`, …), `min`, `max`, `position`, `display`, plus nested `grid` and `ticks` config.
+
+---
+
+## build_chart_config_from_attributes
+
+A convenience builder that constructs a `ChartJSConfig` from a flat attribute dict. Useful when chart parameters come from element attributes or a data layer.
+
+```python
+build_chart_config_from_attributes(chart_attributes: dict[str, Any]) -> ChartJSConfig
+```
+
+Recognized keys:
+
+| Key | Description |
+|---|---|
+| `chart_type` | Sets `ChartJSConfig.type` |
+| `chart_labels` | Sets `ChartJSData.labels` |
+| `chart_data` | Single-dataset data list (creates one `ChartJSDataset`) |
+| `chart_datasets` | List of dataset dicts (creates multiple `ChartJSDataset` objects) |
+| `chart_label` | Label for the auto-created dataset (default `"Dataset"`) |
+| `chart_bg_color` | `backgroundColor` for the auto-created dataset |
+| `chart_border_color` | `borderColor` for the auto-created dataset |
+| `chart_border_width` | `borderWidth` for the auto-created dataset |
+| `chart_title` | Creates a `ChartJSTitle` with this text |
+| `chart_tooltip` | Dict passed to `ChartJSTooltip(...)` |
+| `chart_legend` | Dict passed to `ChartJSLegend(...)` |
+| `chart_scales_x` | Dict passed to `ChartJSAxis(...)` for the X axis |
+| `chart_scales_y` | Dict passed to `ChartJSAxis(...)` for the Y axis |
+| `chart_scales_x1` | Dict passed to `ChartJSAxis(...)` for the secondary X axis |
+| `chart_scales_y1` | Dict passed to `ChartJSAxis(...)` for the secondary Y axis |
+| `chart_stacked` | `bool` — enables stacking on both X and Y axes |
+
+For line charts, the auto-created dataset also picks up `chart_tension` (default `0.4`), `chart_fill` (default `False`), and `chart_point_radius` (default `3`).
+
+---
+
+## Example: bar chart
+
+<Steps>
+  <Step title="Build the config">
+    ```python
+    from aether.plugins.chartjs import (
+        ChartJSConfig,
+        ChartJSData,
+        ChartJSDataset,
+        ChartJSOptions,
+    )
+
+    config = ChartJSConfig(
+        type="bar",
+        data=ChartJSData(
+            labels=["January", "February", "March", "April"],
+            datasets=[
+                ChartJSDataset(
+                    label="Monthly sales",
+                    data=[120, 95, 140, 180],
+                    backgroundColor="var(--chart-1)",
+                    borderColor="var(--chart-1)",
+                )
+            ],
+        ),
+        options=ChartJSOptions(responsive=True, maintainAspectRatio=False),
+    )
+    ```
+  </Step>
+  <Step title="Serialize to JSON">
+    ```python
+    import json
+
+    chart_json = json.dumps(config.model_dump(mode="json"))
+    ```
+
+    `mode="json"` ensures `None` values and nested models serialize correctly.
+  </Step>
+  <Step title="Embed in a script tag">
+    ```python
+    from aether.tags.html import Canvas, Script
+    from aether import render
+
+    canvas = Canvas(id="my-chart")
+    script = Script()(
+        f"new Chart(document.getElementById('my-chart'), {chart_json});"
+    )
+
+    print(render(canvas, script))
+    ```
+  </Step>
+</Steps>
+
+## Example: using the convenience builder
+
+```python
+from aether.plugins.chartjs import build_chart_config_from_attributes
+
+config = build_chart_config_from_attributes({
+    "chart_type": "bar",
+    "chart_title": "Monthly sales",
+    "chart_labels": ["January", "February", "March", "April"],
+    "chart_data": [120, 95, 140, 180],
+    "chart_bg_color": "var(--chart-1)",
+    "chart_stacked": False,
+    "chart_scales_y": {"beginAtZero": True},
+})
+
+chart_json = config.model_dump(mode="json")
+```
+
+<Tip>
+  All models use `model_config = ConfigDict(extra="allow")`, so you can pass any valid Chart.js property not explicitly listed—it will be included in the serialized output unchanged.
+</Tip>
+
+---
+
+## Related
+
+- [Elements reference](/concepts/elements)
+- [HTMX plugin](/plugins/htmx)

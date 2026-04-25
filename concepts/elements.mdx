@@ -1,0 +1,219 @@
+---
+title: "HTML elements in Aether"
+description: "Elements in Aether are Python classes that extend BaseWebElement. Each class maps directly to an HTML tag and produces valid, escaped HTML output."
+---
+
+Every HTML tag in Aether is a Python class. You instantiate the class with attributes, call the result with children, and pass the element to `render()` to produce an HTML string. This page explains the class hierarchy, the two-step syntax, how void and container elements differ, and how children are handled.
+
+## The BaseWebElement class
+
+All elements inherit from `BaseWebElement`, which lives in `aether.base`. The class defines three required class-level attributes:
+
+| Attribute | Type | Purpose |
+| --- | --- | --- |
+| `tag_name` | `str` | The HTML tag name rendered in the output (e.g. `"div"`, `"button"`) |
+| `have_children` | `bool` | Whether the element accepts child content |
+| `web_element_type` | `WebElementType` | The namespace — `HTML`, `SVG`, or `MATHML` |
+
+HTML elements also carry `content_category`, a tuple of `HTMLContentCategories` values that describes where the element is allowed in the document structure.
+
+## Two-step syntax
+
+Aether uses a two-step call pattern to separate attribute declaration from child composition:
+
+```python
+from aether.tags.html import Div, H1, P
+from aether import render
+
+section = Div(_class="card", id="intro")(
+    H1()("Getting started"),
+    P()("Aether builds HTML from Python objects."),
+)
+
+print(render(section))
+```
+
+Output:
+
+```html
+<div class="card" id="intro"><h1>Getting started</h1><p>Aether builds HTML from Python objects.</p></div>
+```
+
+The first call — `Div(_class="card", id="intro")` — instantiates the element and validates its attributes. The second call — `(H1()(...), P()(...))` — appends children. Both calls return the same element instance, so you can also assign them separately:
+
+```python
+card = Div(_class="card")
+card("Some content")
+```
+
+## Container elements
+
+Elements with `have_children = True` wrap their children between opening and closing tags. Most HTML block and inline elements are containers:
+
+```python
+from aether.tags.html import Button, Div, P, Span
+from aether import render
+
+card = Div(_class="card")(
+    P()("Click the button to continue."),
+    Button(type="submit")("Submit"),
+)
+
+print(render(card))
+```
+
+Output:
+
+```html
+<div class="card"><p>Click the button to continue.</p><button type="submit">Submit</button></div>
+```
+
+## Void elements
+
+Void elements have `have_children = False`. They render as self-closing tags and do not accept children. Passing children to a void element raises a `UserWarning` and the children are silently dropped.
+
+```python
+from aether.tags.html import Br, Img, Input
+from aether import render
+
+print(render(Img(src="/logo.png", alt="Site logo")))
+print(render(Input(type="text", name="username")))
+print(render(Br()))
+```
+
+Output:
+
+```html
+<img src="/logo.png" alt="Site logo" />
+<input type="text" name="username" />
+<br />
+```
+
+<Note>
+Calling a void element with children — e.g. `Br()("text")` — emits a `UserWarning` and ignores the children. Void elements never produce a closing tag.
+</Note>
+
+## WebElementType
+
+The `WebElementType` enum (from `aether.base`) identifies the element's namespace:
+
+```python
+from aether.base import WebElementType
+
+WebElementType.HTML    # "html"
+WebElementType.SVG     # "svg"
+WebElementType.MATHML  # "mathml"
+```
+
+All elements in `aether.tags.html` use `WebElementType.HTML`. SVG elements use `WebElementType.SVG`. The type is used internally when rendering; you rarely need to access it directly.
+
+## HTMLContentCategories
+
+`HTMLContentCategories` (from `aether.tags.html._base`) is a `StrEnum` describing the content model categories defined by the HTML spec:
+
+```python
+from aether.tags.html._base import HTMLContentCategories
+
+HTMLContentCategories.METADATA          # "metadata"
+HTMLContentCategories.FLOW              # "flow"
+HTMLContentCategories.SECTIONING        # "sectioning"
+HTMLContentCategories.HEADING           # "heading"
+HTMLContentCategories.PHRASING          # "phrasing"
+HTMLContentCategories.EMBEDDED          # "embedded"
+HTMLContentCategories.INTERACTIVE       # "interactive"
+HTMLContentCategories.PALPABLE          # "palpable"
+HTMLContentCategories.SCRIPT_SUPPORTING # "script_supporting"
+HTMLContentCategories.FORM_ASSOCIATED   # "form_associated"
+HTMLContentCategories.TRANSPARENT       # "transparent"
+```
+
+Each element class declares its categories via the `content_category` tuple. For example, `Button` belongs to `FLOW`, `PHRASING`, `INTERACTIVE`, `FORM_ASSOCIATED`, and `PALPABLE`. You can inspect this on any element class directly:
+
+```python
+from aether.tags.html import Button, Div
+
+print(Div.content_category)
+# (<HTMLContentCategories.FLOW: 'flow'>, <HTMLContentCategories.PALPABLE: 'palpable'>)
+
+print(Button.content_category)
+# (<HTMLContentCategories.FLOW: 'flow'>, <HTMLContentCategories.PHRASING: 'phrasing'>, ...)
+```
+
+## Accepted child types
+
+A container element accepts the following child types in its call:
+
+<AccordionGroup>
+  <Accordion title="Strings">
+    Plain strings are appended as text content and HTML-escaped during rendering.
+
+    ```python
+    Div()("Hello, world!")
+    ```
+  </Accordion>
+  <Accordion title="Other elements">
+    Any `BaseWebElement` instance is valid as a child and is rendered recursively.
+
+    ```python
+    Div()(P()("A paragraph inside a div."))
+    ```
+  </Accordion>
+  <Accordion title="Generators and iterables">
+    Generator expressions and other iterables (lists, tuples, custom iterators) are expanded inline. This is the idiomatic way to render lists of items.
+
+    ```python
+    items = ["apple", "banana", "cherry"]
+    from aether.tags.html import Li, Ul
+
+    Ul()(Li()(item) for item in items)
+    ```
+  </Accordion>
+  <Accordion title="None values">
+    `None` children are silently skipped. This makes conditional rendering straightforward.
+
+    ```python
+    show_badge = False
+
+    Div()(
+        "Main content",
+        Span()("New") if show_badge else None,
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Building custom elements
+
+You can subclass `BaseHTMLElement` to create reusable components with fixed attributes or default children:
+
+```python
+from aether.tags.html._base import BaseHTMLElement, HTMLContentCategories
+from aether.base import WebElementType
+
+
+class Card(BaseHTMLElement):
+    tag_name = "div"
+    have_children = True
+    content_category = (HTMLContentCategories.FLOW,)
+
+
+from aether import render
+
+card = Card(_class="card card--primary")(
+    "Card content goes here."
+)
+
+print(render(card))
+# <div class="card card--primary">Card content goes here.</div>
+```
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Attribute handling and validation" icon="tag" href="/concepts/attributes">
+    How attributes are typed, validated, and converted to HTML attribute names.
+  </Card>
+  <Card title="HTML tags reference" icon="list" href="/reference/html-tags">
+    Complete list of every element available in `aether.tags.html`.
+  </Card>
+</CardGroup>

@@ -1,0 +1,64 @@
+---
+title: "Aether changelog and version history"
+description: "Version history and release notes for the Aether Python library. Covers versioning policy, stability guarantees, and recommendations for pinning dependencies."
+---
+
+Aether follows [semantic versioning](https://semver.org). Because the project is pre-1.0.0, the versioning guarantees differ slightly from a stable release — see the policy below before pinning in production dependencies.
+
+<Warning>
+  Aether is pre-1.0.0. Minor version increments (e.g., 0.4 → 0.5) may introduce breaking changes to the public API. Pin to the minor version in your project dependencies to avoid unexpected breakage.
+</Warning>
+
+---
+
+## Versioning policy
+
+| Version change | Guarantee |
+|---|---|
+| Patch (`0.x.y` → `0.x.z`) | Bug fixes only. Backwards compatible within the same minor version. |
+| Minor (`0.x` → `0.y`) | May introduce breaking changes to the public API. Review the release notes before upgrading. |
+| Major (`0.x` → `1.0`) | Stable public API. Standard semver guarantees apply from this point forward. |
+
+### Pinning recommendation
+
+Pin to the minor version in `pyproject.toml` or `requirements.txt` to receive bug fixes without pulling in potentially breaking minor updates:
+
+```toml
+# pyproject.toml
+dependencies = [
+    "pyaether>=0.4,<0.5",
+]
+```
+
+```text
+# requirements.txt
+pyaether>=0.4,<0.5
+```
+
+<Tip>
+  Once Aether reaches 1.0.0, standard `~=0.x` or `>=1.0,<2.0` pinning strategies will apply.
+</Tip>
+
+---
+
+## Current version
+
+The latest release is **0.4.21**.
+
+```python
+from aether import __version__
+
+print(__version__)  # "0.4.21"
+```
+
+---
+
+## Release history
+
+Full release notes for each version are published on the GitHub releases page:
+
+[https://github.com/pyaether/aether/releases](https://github.com/pyaether/aether/releases)
+
+<Note>
+  The changelog will be mirrored here as versions are released.
+</Note>

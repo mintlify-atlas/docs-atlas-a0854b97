@@ -1,0 +1,206 @@
+---
+title: "SVG element reference for Aether"
+description: "Complete reference for all SVG elements in aether.tags.svg, using the same composable call-style API as HTML elements, with presentation attributes via kwargs."
+---
+
+`aether.tags.svg` provides SVG elements with the same composable API as HTML elements. Each SVG element is a Python class that accepts SVG attributes as keyword arguments and can receive child elements via the call syntax. All SVG element classes extend `BaseSVGElement`, which sets `web_element_type` to `WebElementType.SVG`.
+
+```python
+from aether.tags.svg import Svg, Circle, Rect, Path, G, Defs, LinearGradient, Stop, Text
+```
+
+See the [SVG guide](/guides/svg) for usage patterns and composition examples.
+
+---
+
+## Embedding SVG in HTML
+
+SVG elements compose with HTML elements using the same call pattern. Pass an `Svg` instance as a child of any HTML element.
+
+```python
+from aether.tags.html import Div
+from aether.tags.svg import Svg, Circle
+
+Div(_class="icon")(
+    Svg(width="100", height="100", viewBox="0 0 100 100")(
+        Circle(cx="50", cy="50", r="40", fill="steelblue"),
+    )
+)
+```
+
+---
+
+## Attribute naming
+
+SVG presentation attributes that contain hyphens are passed as keyword arguments with underscores. Aether converts leading underscores and internal underscores to hyphens at render time.
+
+```python
+# stroke-width becomes stroke_width
+Circle(cx="50", cy="50", r="30", stroke="black", stroke_width="2", fill="none")
+```
+
+<Note>
+  Use `_class` to set the SVG `class` attribute, consistent with HTML element usage.
+</Note>
+
+---
+
+## Elements
+
+### `Svg`
+
+Root SVG container. Renders as `<svg>`. Accepts all SVG presentation attributes plus `width`, `height`, `viewBox`, `xmlns`, and others.
+
+```python
+Svg(width="200", height="200", viewBox="0 0 200 200")(
+    # child elements
+)
+```
+
+---
+
+### `Circle`
+
+Renders a circle. Key attributes: `cx` (center x), `cy` (center y), `r` (radius).
+
+```python
+Circle(cx="50", cy="50", r="40", fill="tomato")
+```
+
+---
+
+### `Ellipse`
+
+Renders an ellipse. Key attributes: `cx` (center x), `cy` (center y), `rx` (horizontal radius), `ry` (vertical radius).
+
+```python
+Ellipse(cx="100", cy="50", rx="80", ry="30", fill="gold")
+```
+
+---
+
+### `Rect`
+
+Renders a rectangle. Key attributes: `x`, `y`, `width`, `height`, `rx` (corner radius x), `ry` (corner radius y).
+
+```python
+Rect(x="10", y="10", width="80", height="60", rx="5", fill="mediumpurple")
+```
+
+---
+
+### `Line`
+
+Renders a straight line segment. Key attributes: `x1`, `y1` (start point), `x2`, `y2` (end point).
+
+```python
+Line(x1="0", y1="0", x2="100", y2="100", stroke="black", stroke_width="2")
+```
+
+---
+
+### `Path`
+
+Renders an arbitrary path shape. Key attribute: `d` (SVG path data string).
+
+```python
+Path(d="M 10 10 L 90 10 L 50 80 Z", fill="coral")
+```
+
+---
+
+### `Polygon`
+
+Renders a closed polygon. Key attribute: `points` (space- or comma-separated coordinate pairs).
+
+```python
+Polygon(points="50,0 100,100 0,100", fill="teal")
+```
+
+---
+
+### `G`
+
+Group container. Wraps multiple SVG elements so transforms and styles can be applied to all children at once.
+
+```python
+G(transform="translate(10, 10)", opacity="0.8")(
+    Circle(cx="20", cy="20", r="15"),
+    Rect(x="5", y="40", width="30", height="20"),
+)
+```
+
+---
+
+### `Defs`
+
+Definition container. Use `Defs` to declare reusable assets such as gradients, clip paths, and filters that are referenced elsewhere in the SVG.
+
+```python
+Defs()(
+    LinearGradient(id="grad1", x1="0%", y1="0%", x2="100%", y2="0%")(
+        Stop(offset="0%", stop_color="red"),
+        Stop(offset="100%", stop_color="blue"),
+    )
+)
+```
+
+---
+
+### `LinearGradient`
+
+Defines a linear gradient. Key attributes: `id` (required for referencing), `x1`, `y1`, `x2`, `y2`, `gradientUnits`. Must be placed inside `Defs`.
+
+```python
+LinearGradient(id="myGrad", x1="0%", y1="0%", x2="0%", y2="100%")(
+    Stop(offset="0%", stop_color="white", stop_opacity=1.0),
+    Stop(offset="100%", stop_color="navy", stop_opacity=1.0),
+)
+```
+
+---
+
+### `Stop`
+
+Defines a color stop within a gradient. Key attributes: `offset` (position as percentage or decimal string), `stop_color` (str), `stop_opacity` (float, `> 0.0` and `<= 1.0`).
+
+```python
+Stop(offset="50%", stop_color="#ff6600", stop_opacity=0.8)
+```
+
+<Note>
+  `stop_opacity` is a `float`, not a string. Values must be greater than `0.0` and at most `1.0`. Passing `0.0` or a value above `1.0` raises a `ValueError`.
+</Note>
+
+---
+
+### `Text`
+
+Renders SVG text. Key attributes: `x`, `y` (position). Text content is passed as a child string.
+
+```python
+Text(x="10", y="50", font_size="20", fill="black")("Hello, SVG!")
+```
+
+---
+
+## Attributes TypedDicts
+
+Each element has a corresponding `*Attributes` TypedDict for type-checking attribute dictionaries.
+
+| Element | Attributes TypedDict |
+|---|---|
+| `Svg` | `SvgAttributes` |
+| `Circle` | `CircleAttributes` |
+| `Ellipse` | `EllipseAttributes` |
+| `Rect` | `RectAttributes` |
+| `Line` | `LineAttributes` |
+| `Path` | `PathAttributes` |
+| `Polygon` | `PolygonAttributes` |
+| `G` | `GAttributes` |
+| `Defs` | `DefsAttributes` |
+| `LinearGradient` | `LinearGradientAttributes` |
+| `Stop` | `StopAttributes` |
+| `Text` | `TextAttributes` |
+
+`BaseSVGAttributes` is the shared base TypedDict for all SVG element attributes.

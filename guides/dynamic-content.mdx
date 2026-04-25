@@ -1,0 +1,160 @@
+---
+title: "Dynamic content and list rendering in Aether"
+description: "Use Python's native loops, generators, and conditionals to render lists and conditional content — no template language required."
+---
+
+Aether leverages Python's native constructs for dynamic content. Because elements are ordinary Python objects and `__call__` accepts generators and iterables, you can use comprehensions, `for` loops, and conditional expressions directly — there is no separate template syntax to learn.
+
+## List rendering with generator expressions
+
+The most concise way to render a list is to pass a generator expression directly to a parent element's call:
+
+```python
+from aether.tags.html import Ul, Li
+from aether import render
+
+items = ["apple", "banana", "cherry"]
+item_list = Ul()(Li()(item) for item in items)
+
+print(render(item_list))
+```
+
+The generator is consumed lazily and its results are appended as children. Any iterable works the same way — you can also pass a list comprehension:
+
+```python
+rows = [Li()(item) for item in items]
+item_list = Ul()(*rows)
+```
+
+## Building child lists with regular for loops
+
+When you need more control — for example, to conditionally skip items or build complex child elements — use a regular `for` loop to assemble a list first:
+
+```python
+from aether.tags.html import Ul, Li, Span
+
+children = []
+for item in items:
+    children.append(Li()(Span(_class="label")(item)))
+
+item_list = Ul()(*children)
+```
+
+Passing the list with `*children` unpacks it as positional arguments to `__call__`.
+
+## Conditional rendering
+
+Pass `None` to skip a child entirely. `BaseWebElement.__call__` silently drops `None` values, so you can use conditional expressions without any special helpers:
+
+```python
+from aether.tags.html import Nav, A
+
+is_admin = False
+
+nav = Nav()(
+    A(href="/dashboard")("Dashboard"),
+    A(href="/admin")("Admin") if is_admin else None,
+    A(href="/settings")("Settings"),
+)
+```
+
+The `None` from the falsy branch is dropped, and the rendered `<nav>` contains only the two visible links.
+
+## Conditional expression pattern
+
+A common pattern is to guard a whole element behind a condition:
+
+```python
+from aether.tags.html import P
+
+user = {"name": "Alice"}
+
+greeting = P()("Hello, " + user["name"]) if user else None
+```
+
+If `user` is falsy the expression evaluates to `None`, which any parent element accepts and discards.
+
+## Nested dynamic content
+
+You can nest dynamic structures at any depth. Each level is just Python:
+
+```python
+from aether.tags.html import Div, H2, Ul, Li
+
+sections = [
+    {"title": "Fruits", "items": ["apple", "banana"]},
+    {"title": "Veggies", "items": ["carrot", "broccoli"]},
+]
+
+container = Div()(
+    Div(_class="section")(
+        H2()(section["title"]),
+        Ul()(Li()(item) for item in section["items"]),
+    )
+    for section in sections
+)
+```
+
+## Combining multiple data sources
+
+Use unpacking or multiple generator arguments to combine sources into a single element tree:
+
+```python
+from aether.tags.html import Ul, Li
+
+pinned = ["Overview"]
+pages = ["Installation", "Configuration", "Deployment"]
+
+nav_list = Ul()(
+    *[Li(_class="pinned")(item) for item in pinned],
+    *[Li()(item) for item in pages],
+)
+```
+
+## Real example: product listing fragment
+
+```python
+from aether.tags.html import Ul, Li, Span, A
+from aether import render
+
+products = [
+    {"id": 1, "name": "Widget A", "slug": "widget-a", "in_stock": True},
+    {"id": 2, "name": "Widget B", "slug": "widget-b", "in_stock": False},
+    {"id": 3, "name": "Widget C", "slug": "widget-c", "in_stock": True},
+]
+
+listing = Ul(_class="product-list")(
+    Li(_class="product-item")(
+        A(href=f"/products/{p['slug']}")(p["name"]),
+        Span(_class="badge badge--out-of-stock")("Out of stock") if not p["in_stock"] else None,
+    )
+    for p in products
+)
+
+print(render(listing))
+```
+
+## Real example: conditional navigation
+
+```python
+from aether.tags.html import Nav, Ul, Li, A
+from aether import render
+
+def nav_links(is_authenticated: bool, is_admin: bool) -> Nav:
+    return Nav()(
+        Ul()(
+            Li()(A(href="/")("Home")),
+            Li()(A(href="/docs")("Docs")),
+            Li()(A(href="/account")("Account")) if is_authenticated else None,
+            Li()(A(href="/admin")("Admin")) if is_admin else None,
+            Li()(A(href="/login")("Log in")) if not is_authenticated else None,
+        )
+    )
+
+print(render(nav_links(is_authenticated=True, is_admin=False)))
+```
+
+<Tip>
+  Because children are plain Python values, you can extract complex child-building
+  logic into helper functions and compose them just like any other Python code.
+</Tip>

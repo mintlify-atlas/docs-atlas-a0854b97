@@ -1,0 +1,135 @@
+---
+title: "Tailwind CSS class merging with tw_merge"
+description: "tw_merge() resolves conflicting Tailwind CSS utility classes using a last-win strategy, handling display, sizing, spacing, typography, and flexbox groups."
+---
+
+`tw_merge` takes any number of Tailwind CSS class strings and returns a single deduplicated string where conflicting utilities are resolved by last-win precedence. This lets you safely compose class lists from multiple sources—base styles, conditional overrides, and user props—without worrying about stale classes persisting in the output.
+
+## Import
+
+```python
+from aether.plugins.tailwindcss import tw_merge
+```
+
+## Signature
+
+```python
+tw_merge(*tw_classes: str) -> str
+```
+
+Accepts one or more strings, each of which may contain multiple space-separated Tailwind classes. Returns a single merged string sorted in original input order.
+
+## Last-win resolution
+
+When two classes belong to the same conflict group, the one that appears later in the argument list wins. Classes in different groups are always preserved.
+
+```python
+tw_merge("bg-red-500", "bg-blue-500")
+# "bg-blue-500"
+
+tw_merge("text-sm font-bold", "text-lg")
+# "font-bold text-lg"
+
+tw_merge("flex items-center", "block")
+# "items-center block"
+```
+
+## Spacing: CSS property mapping
+
+Spacing utilities (`p-`, `m-`, `px-`, `py-`, etc.) are resolved by the CSS properties they affect, not just their class prefix. This means shorthand utilities correctly override or are overridden by their individual-side counterparts.
+
+| Class prefix | CSS properties affected |
+|---|---|
+| `p-` | all four padding sides |
+| `px-` | `padding-left`, `padding-right` |
+| `py-` | `padding-top`, `padding-bottom` |
+| `pt-` / `pr-` / `pb-` / `pl-` | individual sides |
+| `m-` | all four margin sides |
+| `mx-` | `margin-left`, `margin-right` |
+| `my-` | `margin-top`, `margin-bottom` |
+| `mt-` / `mr-` / `mb-` / `ml-` | individual sides |
+
+```python
+tw_merge("p-4", "px-8")
+# "pt-4 pr-8 pb-4 pl-8" is NOT the output — spacing is resolved per CSS property
+# Result: "p-4 px-8" — px-8 overrides left/right, p-4 covers top/bottom
+```
+
+<Note>
+  `px-8` overrides `margin-left` and `margin-right` from `p-4`, but `p-4` still controls `padding-top` and `padding-bottom`. Both classes appear in the output.
+</Note>
+
+## Conflict groups
+
+`tw_merge` tracks conflicts across these utility categories:
+
+**Display & layout**
+`display` (block, flex, grid, hidden, …) · `visibility` · `position` · `float` · `overflow` · `z-index`
+
+**Sizing**
+`width` (w-) · `min-width` · `max-width` · `height` · `min-height` · `max-height` · `size`
+
+**Typography**
+`font-size` (text-xs → text-9xl) · `font-weight` · `font-family` · `font-style` · `text-align` · `text-color` · `text-decoration` · `text-transform` · `line-height` · `letter-spacing`
+
+**Backgrounds**
+`bg-color` (bg-) · `bg-attachment` · `bg-clip` · `bg-position` · `bg-size` · `bg-image`
+
+**Borders**
+`border-radius` · `border-width` · `border-color` · `border-style` · `outline-style` · `ring-width`
+
+**Flexbox & Grid**
+`flex-direction` · `flex-wrap` · `flex-grow` · `flex-shrink` · `grid-template-columns` (grid-cols-) · `gap` · `justify-content` · `align-items` · `align-self`
+
+## Variant awareness
+
+Classes with a variant prefix (e.g. `hover:`, `focus:`, `md:`) are treated as separate conflict groups from their non-prefixed equivalents.
+
+```python
+tw_merge("bg-red-500", "hover:bg-red-500", "hover:bg-blue-500")
+# "bg-red-500 hover:bg-blue-500"
+# hover:bg-red-500 is overridden by hover:bg-blue-500
+# bg-red-500 (no variant) is unaffected
+```
+
+## Arbitrary values
+
+Classes using the bracket syntax are handled correctly.
+
+```python
+tw_merge("text-lg", "text-[1.375rem]")
+# "text-[1.375rem]"
+
+tw_merge("bg-blue-500", "bg-[#ff0000]")
+# "bg-[#ff0000]"
+```
+
+## Unknown classes
+
+<Warning>
+  Classes that do not belong to any known conflict group are passed through unchanged. If you use custom Tailwind utilities or plugins, they will not conflict with built-in classes—even if they logically should.
+</Warning>
+
+```python
+tw_merge("my-custom-class", "bg-blue-500", "my-custom-class")
+# "my-custom-class bg-blue-500 my-custom-class"
+# Duplicate unknown classes are NOT deduplicated
+```
+
+## Combining with conditional logic
+
+A common pattern is merging a base class string with runtime conditions:
+
+```python
+from aether.plugins.tailwindcss import tw_merge
+
+def button_classes(primary: bool) -> str:
+    base = "px-4 py-2 rounded font-medium"
+    variant = "bg-blue-600 text-white" if primary else "bg-gray-100 text-gray-900"
+    return tw_merge(base, variant)
+```
+
+## Related
+
+- [Elements reference](/concepts/elements)
+- [Alpine.js plugin](/plugins/alpinejs)
